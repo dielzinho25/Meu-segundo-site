@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda Avançada</title>
+
+<style>
+body{font-family:Arial;background:#f2f4f8;margin:0}
+header{background:#111;color:#fff;padding:12px;display:flex;justify-content:space-between;align-items:center}
+.card{background:#fff;margin:10px;padding:15px;border-radius:14px}
+input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #ccc}
+button{background:#111;color:#fff;border:0;cursor:pointer}
+.ok{background:#2e7d32}
+.warn{background:#f9a825;color:#000}
+.danger{background:#c62828}
+.ag{background:#fafafa;border-left:5px solid #1565c0;margin-top:8px;padding:10px;border-radius:10px}
+.ag.pago{border-left-color:#2e7d32}
+.small{font-size:12px;color:#555}
+.rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.rel-item{padding:10px;border-radius:10px;background:#f0f0f0;text-align:center;font-weight:bold}
+.rel-item span{display:block;font-size:12px;opacity:.8}
+body.dark{background:#121212;color:#e0e0e0}
+body.dark header{background:#000}
+body.dark .card,body.dark .ag,body.dark .rel-item{background:#1e1e1e}
+body.dark input{background:#2a2a2a;color:#fff;border:1px solid #444}
+body.dark button{background:#333}
+</style>
+</head>
+
+<body>
+
+<header>
+ <b>📅 Agenda Avançada</b>
+ <button onclick="toggleTema()">🌙</button>
+</header>
+
+<div class="card">
+ <input id="cliente" placeholder="Cliente">
+ <input id="tel" placeholder="Telefone / WhatsApp">
+ <input id="data" type="date">
+ <input id="hora" type="time">
+ <input id="valor" type="number" placeholder="Valor">
+ <button onclick="salvar()">Salvar</button>
+</div>
+
+<div class="card">
+ <input id="fBusca" placeholder="🔍 Buscar por nome ou telefone" oninput="render()">
+ <input id="fData" type="date" onchange="render()">
+ <select id="fStatus" onchange="render()">
+  <option value="todos">Todos</option>
+  <option value="pendente">Pendentes</option>
+  <option value="pago">Pagos</option>
+ </select>
+</div>
+
+<div class="card">
+ <b>📊 Relatório</b>
+ <div id="relatorio"></div>
+</div>
+
+<div class="card">
+ <div id="lista"></div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+/* ===== Firebase ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDrtZxbKXk7hjlqBL_BLoZMTBdc5iqBCXo",
+  authDomain: "ferramentas-projeto.firebaseapp.com",
+  projectId: "ferramentas-projeto",
+  storageBucket: "ferramentas-projeto.appspot.com",
+  messagingSenderId: "877191590019",
+  appId: "1:877191590019:android:152d4d35bdd3024c53abb6"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let ag=[],editId=null;
+
+/* ===== Local + Tempo Real ===== */
+function salvarLocal(){
+ localStorage.setItem("agenda_local",JSON.stringify(ag));
+ ag.forEach(item=>{
+  db.collection("agenda").doc(String(item.id)).set(item);
+ });
+}
+
+async function carregarLocal(){
+
+ // Carrega offline primeiro
+ ag = JSON.parse(localStorage.getItem("agenda_local") || "[]");
+ render();
+
+ // Sincronização em tempo real
+ db.collection("agenda").onSnapshot(snapshot => {
+
+   snapshot.docChanges().forEach(change => {
+
+     const dados = change.doc.data();
+     const existe = ag.find(a => a.id == dados.id);
+
+     if (change.type === "added") {
+       if (!existe) {
+         ag.push(dados);
+       }
+     }
+
+     if (change.type === "modified") {
+       let i = ag.findIndex(a => a.id == dados.id);
+       if (i > -1) {
+         ag[i] = dados;
+       }
+     }
+
+     if (change.type === "removed") {
+       ag = ag.filter(a => a.id != dados.id);
+     }
+
+   });
+
+   localStorage.setItem("agenda_local", JSON.stringify(ag));
+   render();
+
+ });
+
+}
+
+/* ===== Tema ===== */
+function toggleTema(){
+ document.body.classList.toggle("dark");
+ localStorage.setItem("tema_dark",document.body.classList.contains("dark"));
+}
+if(localStorage.getItem("tema_dark")==="true")document.body.classList.add("dark");
+
+/* ===== Limpar ===== */
+function limpar(){
+ cliente.value=tel.value=data.value=hora.value=valor.value="";
+ editId=null;
+}
+
+/* ===== Salvar / Editar ===== */
+function salvar(){
+ if(!cliente.value||!data.value||!hora.value) return alert("Preencha tudo");
+
+ if(editId){
+  let i=ag.findIndex(a=>a.id===editId);
+  if(ag[i].pago) return alert("Agendamento pago não pode ser editado");
+  ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
+ }else{
+  ag.push({
+   id:Date.now(),
+   cliente:cliente.value,
+   tel:tel.value,
+   data:data.value,
+   hora:hora.value,
+   valor:+valor.value,
+   reservado:true,
+   pago:false,
+   pagoEm:"",
+   horaPagamento:"",
+   favorito:false
+  });
+ }
+ salvarLocal();limpar();render();
+}
+
+/* ===== Ações ===== */
+function editar(id){
+ let a=ag.find(x=>x.id===id);
+ cliente.value=a.cliente;tel.value=a.tel;data.value=a.data;hora.value=a.hora;valor.value=a.valor;
+ editId=id;
+}
+
+function pagar(id){
+ let a=ag.find(x=>x.id===id);
+ let d=new Date();
+ a.pago=true;
+ a.pagoEm=d.toLocaleDateString();
+ a.horaPagamento=d.toLocaleTimeString();
+ salvarLocal();render();
+}
+
+function reservar(id){
+ let a=ag.find(x=>x.id===id);
+ ag.push({...a,id:Date.now(),pago:false,pagoEm:"",horaPagamento:""});
+ salvarLocal();render();
+}
+
+function excluir(id){
+ if(confirm("Excluir agendamento?")){
+  ag=ag.filter(a=>a.id!==id);
+  db.collection("agenda").doc(String(id)).delete();
+  salvarLocal();render();
+ }
+}
+
+function favoritar(id){
+ let a=ag.find(x=>x.id===id);
+ a.favorito=!a.favorito;
+ salvarLocal();render();
+}
+
+/* ===== Relatório ===== */
+function gerarRelatorio(){
+ let hoje=fData.value||new Date().toISOString().slice(0,10);
+ let mes=hoje.slice(0,7);
+ let dT=0,dP=0,mT=0;
+ ag.forEach(a=>{
+  if(a.data===hoje){dT+=a.valor;if(a.pago)dP+=a.valor}
+  if(a.data.slice(0,7)===mes)mT+=a.valor;
+ });
+ relatorio.innerHTML=`
+ <div class="rel-box">
+  <div class="rel-item">R$ ${dT}<span>Total do dia</span></div>
+  <div class="rel-item">R$ ${dP}<span>Recebido hoje</span></div>
+  <div class="rel-item">R$ ${dT-dP}<span>Pendente</span></div>
+  <div class="rel-item">R$ ${mT}<span>Total do mês</span></div>
+ </div>`;
+}
+
+/* ===== Render ===== */
+function render(){
+ lista.innerHTML="";
+ ag
+ .filter(a=>{
+  let b=fBusca.value.toLowerCase();
+  if(b){
+   if(!a.cliente.toLowerCase().includes(b) && !(a.tel||"").toLowerCase().includes(b)) return false;
+  }
+  if(fData.value&&a.data!==fData.value)return false;
+  if(fStatus.value==="pago"&&!a.pago)return false;
+  if(fStatus.value==="pendente"&&a.pago)return false;
+  return true;
+ })
+ .sort((a,b)=>b.favorito-a.favorito||a.hora.localeCompare(b.hora))
+ .forEach(a=>{
+  lista.innerHTML+=`
+  <div class="ag ${a.pago?'pago':''}">
+   <b>${a.data} ${a.hora}</b><br>
+   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}<br>
+   <span class="small">
+    ${a.tel||""}<br>
+    ${a.pago?`Pago em ${a.pagoEm} ${a.horaPagamento}`:"Reservado"}
+   </span>
+   <button onclick="favoritar(${a.id})">${a.favorito?"⭐ Favorito":"☆ Favoritar"}</button>
+   <button onclick="editar(${a.id})">✏️</button>
+   <button class="ok" onclick="pagar(${a.id})">💰</button>
+   <button class="warn" onclick="reservar(${a.id})">🔁</button>
+   <button class="danger" onclick="excluir(${a.id})">🗑</button>
+  </div>`;
+ });
+ gerarRelatorio();
+}
+
+window.onload=async ()=>{
+ await carregarLocal();
+ render();
+}
+</script>
+
+</body>
+</html>
