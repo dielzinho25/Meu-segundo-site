@@ -19,6 +19,11 @@ button{background:#111;color:#fff;border:0}
 .rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .rel-item{padding:10px;border-radius:10px;background:#f0f0f0;text-align:center;font-weight:bold}
 .rel-item span{display:block;font-size:12px}
+
+body.dark{background:#121212;color:#fff}
+body.dark .card{background:#1e1e1e}
+body.dark input{background:#2a2a2a;color:#fff;border:1px solid #444}
+
 #btnConfig{position:fixed;right:15px;bottom:20px;width:55px;height:55px;border-radius:50%;background:#2e7d32;color:#fff;font-size:22px}
 </style>
 </head>
@@ -87,6 +92,15 @@ const firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
 
+/* TEMA */
+function toggleTema(){
+ document.body.classList.toggle("dark");
+ localStorage.setItem("tema_dark",document.body.classList.contains("dark"));
+}
+if(localStorage.getItem("tema_dark")==="true"){
+ document.body.classList.add("dark");
+}
+
 /* LOCAL + FIREBASE */
 function salvarLocal(){
  localStorage.setItem("agenda",JSON.stringify(ag));
@@ -115,7 +129,16 @@ function salvar(){
   let i=ag.findIndex(a=>a.id===editId);
   ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
  }else{
-  ag.push({id:Date.now(),cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value,pago:false});
+  ag.push({
+   id:Date.now(),
+   cliente:cliente.value,
+   tel:tel.value,
+   data:data.value,
+   hora:hora.value,
+   valor:+valor.value,
+   pago:false,
+   favorito:false
+  });
  }
 
  salvarLocal();limpar();render();
@@ -142,6 +165,12 @@ function pagar(id){
 function reagendar(id){
  let a=ag.find(x=>x.id===id);
  ag.push({...a,id:Date.now(),pago:false});
+ salvarLocal();render();
+}
+
+function favoritar(id){
+ let a=ag.find(x=>x.id===id);
+ a.favorito=!a.favorito;
  salvarLocal();render();
 }
 
@@ -176,18 +205,24 @@ function gerarRelatorio(){
 /* RENDER */
 function render(){
  lista.innerHTML="";
- ag.forEach(a=>{
+
+ ag
+ .sort((a,b)=>b.favorito-a.favorito)
+ .forEach(a=>{
   lista.innerHTML+=`
   <div class="ag ${a.pago?'pago':''}">
    <b>${a.data} ${a.hora}</b><br>
-   ${a.cliente} — R$ ${a.valor}<br>
 
+   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}<br>
+
+   <button onclick="favoritar(${a.id})">${a.favorito?"⭐ Favorito":"☆ Favoritar"}</button>
    <button onclick="editar(${a.id})">✏️</button>
    <button onclick="pagar(${a.id})">💰</button>
    <button onclick="reagendar(${a.id})">🔁</button>
    <button onclick="excluir(${a.id})">🗑</button>
   </div>`;
  });
+
  gerarRelatorio();
 }
 
@@ -209,7 +244,7 @@ function loginGoogle(){
  google.accounts.id.prompt();
 }
 
-/* BACKUP REAL */
+/* BACKUP */
 async function salvarDrive(){
  if(!accessToken)return alert("Conecte o Drive");
 
@@ -256,10 +291,6 @@ async function carregarDrive(){
 /* UI */
 function toggleDrive(){
  boxDrive.style.display=boxDrive.style.display==="none"?"block":"none";
-}
-
-function toggleTema(){
- document.body.classList.toggle("dark");
 }
 
 function limpar(){
