@@ -11,18 +11,29 @@ header{background:#111;color:#fff;padding:12px;display:flex;justify-content:spac
 .card{background:#fff;margin:10px;padding:15px;border-radius:14px}
 input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #ccc}
 button{background:#111;color:#fff;border:0}
+
 .ok{background:#2e7d32}
 .warn{background:#f9a825;color:#000}
 .danger{background:#c62828}
+
 .ag{background:#fafafa;border-left:5px solid #1565c0;margin-top:8px;padding:10px;border-radius:10px}
 .ag.pago{border-left-color:#2e7d32}
+
 .rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .rel-item{padding:10px;border-radius:10px;background:#f0f0f0;text-align:center;font-weight:bold}
 .rel-item span{display:block;font-size:12px}
 
-body.dark{background:#121212;color:#fff}
+/* DARK MODE FIX */
+body.dark{background:#121212;color:#e0e0e0}
+body.dark header{background:#000}
 body.dark .card{background:#1e1e1e}
-body.dark input{background:#2a2a2a;color:#fff;border:1px solid #444}
+body.dark input,body.dark select{background:#2a2a2a;color:#fff;border:1px solid #444}
+body.dark .rel-item{background:#2a2a2a;color:#fff}
+body.dark .ag{background:#1e1e1e;color:#fff}
+body.dark button{background:#333;color:#fff}
+body.dark .ok{background:#2e7d32}
+body.dark .warn{background:#f9a825;color:#000}
+body.dark .danger{background:#c62828}
 
 #btnConfig{position:fixed;right:15px;bottom:20px;width:55px;height:55px;border-radius:50%;background:#2e7d32;color:#fff;font-size:22px}
 </style>
@@ -212,7 +223,6 @@ function render(){
   lista.innerHTML+=`
   <div class="ag ${a.pago?'pago':''}">
    <b>${a.data} ${a.hora}</b><br>
-
    ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}<br>
 
    <button onclick="favoritar(${a.id})">${a.favorito?"⭐ Favorito":"☆ Favoritar"}</button>
@@ -306,4 +316,4 @@ window.onload=()=>{
 </script>
 
 </body>
- </html>
+</html>
