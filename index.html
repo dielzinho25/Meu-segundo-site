@@ -169,16 +169,16 @@ function gerarRelatorio(){
 
 /* RENDER */
 function render(){
- lista.innerHTML="";
- ag.forEach(a=>{
-  lista.innerHTML+=`
-  <div class="ag ${a.pago?'pago':''}">
-   <b>${a.data} ${a.hora}</b><br>
-   ${a.cliente} — R$ ${a.valor}<br>
-   <button onclick="editar(${a.id})">✏️</button>
-   <button onclick="pagar(${a.id})">💰</button>
-   <button onclick="excluir(${a.id})">🗑</button>
-  </div>`;
+ lista.innerHTML+=`
+<div class="ag ${a.pago?'pago':''}">
+ <b>${a.data} ${a.hora}</b><br>
+ ${a.cliente} — R$ ${a.valor}<br>
+
+ <button onclick="editar(${a.id})">✏️</button>
+ <button onclick="pagar(${a.id})">💰</button>
+ <button onclick="reagendar(${a.id})">🔁</button>
+ <button onclick="excluir(${a.id})">🗑</button>
+</div>`;
  });
  gerarRelatorio();
 }
@@ -214,6 +214,85 @@ function limpar(){
  cliente.value=tel.value=data.value=hora.value=valor.value="";
  editId=null;
 }
+
+ async function salvarDrive(){
+ if(!accessToken){
+  alert("Conecte o Drive primeiro");
+  return;
+ }
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ let arquivo = new Blob([JSON.stringify(ag)], {type:"application/json"});
+
+ let form = new FormData();
+ form.append("metadata", new Blob([JSON.stringify({
+  name:"agenda_backup.json"
+ })], {type:"application/json"}));
+
+ form.append("file", arquivo);
+
+ let url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+ let method = "POST";
+
+ if(fileId){
+  url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
+  method = "PATCH";
+ }
+
+ let res = await fetch(url,{
+  method:method,
+  headers:{ Authorization:"Bearer "+accessToken },
+  body:form
+ });
+
+ let data = await res.json();
+
+ if(!fileId){
+  localStorage.setItem("drive_file_id", data.id);
+ }
+
+ alert("Backup salvo no Drive ☁️🔥");
+ }
+
+ async function carregarDrive(){
+ if(!accessToken){
+  alert("Conecte o Drive primeiro");
+  return;
+ }
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ if(!fileId){
+  alert("Nenhum backup encontrado");
+  return;
+ }
+
+ let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
+  headers:{ Authorization:"Bearer "+accessToken }
+ });
+
+ let dados = await res.json();
+
+ ag = dados;
+ salvarLocal();
+ render();
+
+ alert("Backup restaurado 🚀");
+ }
+ 
+ function reagendar(id){
+ let a = ag.find(x=>x.id===id);
+
+ ag.push({
+  ...a,
+  id: Date.now(),
+  pago: false
+ });
+
+ salvarLocal();
+ render();
+ }
 
 /* INIT */
 window.onload=()=>{
