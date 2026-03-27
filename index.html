@@ -25,6 +25,20 @@ body.dark header{background:#000}
 body.dark .card,body.dark .ag,body.dark .rel-item{background:#1e1e1e}
 body.dark input{background:#2a2a2a;color:#fff;border:1px solid #444}
 body.dark button{background:#333}
+ btnConfig{
+ position: fixed;
+ right: 15px;
+ bottom: 20px;
+ width: 55px;
+ height: 55px;
+ border-radius: 50%;
+ background: #2e7d32;
+ color: #fff;
+ font-size: 22px;
+ border: none;
+ box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+ z-index: 999;
+ }
 </style>
 </head>
 
@@ -66,7 +80,311 @@ body.dark button{background:#333}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+ <!-- BOTÕES GOOGLE (SEM DUPLICAÇÃO) -->
+<div id="boxDrive" style="display:none">
+
+ <button onclick="conectarDrive()">🔑 Conectar Drive</button>
+ <button onclick="loginGoogle()">🔐 Login Google</button>
+ <button onclick="salvarDrive()">☁️ Backup Drive</button>
+ <button onclick="carregarDrive()">📥 Restaurar Backup</button>
+ <button onclick="excluirDrive()">🗑 Excluir Backup</button>
+ <button onclick="renomearDrive('agenda_backup.json')">✏️ Renomear</button>
+
+</div>
+ 
 <script>
+let ag=[];
+let editId=null;
+let ag=[],editId=null;
+let accessToken = null;
+
+function toggleDrive(){
+ let box = document.getElementById("boxDrive");
+
+ if(box.style.display === "none"){
+  box.style.display = "block";
+ }else{
+  box.style.display = "none";
+ }
+ }
+
+ async function renomearDrive(novoNome){
+ let fileId = localStorage.getItem("drive_file_id");
+
+ await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{
+  method:"PATCH",
+  headers:{
+   Authorization:"Bearer "+accessToken,
+   "Content-Type":"application/json"
+  },
+  body: JSON.stringify({
+   name: novoNome
+  })
+ });
+
+ alert("Nome alterado ✏️");
+ }
+
+ async function excluirDrive(){
+ if(!accessToken){
+  alert("Conecte o Drive primeiro");
+  return;
+ }
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ if(!fileId){
+  alert("Nenhum arquivo encontrado");
+  return;
+ }
+
+ await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`,{
+  method:"DELETE",
+  headers:{
+   Authorization:"Bearer "+accessToken
+  }
+ });
+
+ localStorage.removeItem("drive_file_id");
+
+ alert("Arquivo excluído 🗑");
+ }
+
+ async function syncDrive(){
+ if(!accessToken) return;
+
+ let fileId = localStorage.getItem("drive_file_id");
+ if(!fileId) return;
+
+ try{
+  let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
+   headers:{ Authorization:"Bearer "+accessToken }
+  });
+
+  let dadosDrive = await res.json();
+
+  // juntar sem duplicar
+  let todos = [...ag, ...dadosDrive];
+
+  let unico = [];
+  let ids = new Set();
+
+  todos.forEach(item=>{
+   if(!ids.has(item.id)){
+    ids.add(item.id);
+    unico.push(item);
+   }
+  });
+
+  ag = unico;
+
+  salvarLocal();
+  render();
+
+ }catch(e){
+  console.log("Erro sync:", e);
+ }
+ }
+
+ async function carregarDrive(){
+ if(!accessToken){
+  alert("Conecte o Drive primeiro");
+  return;
+ }
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ if(!fileId){
+  alert("Nenhum backup encontrado");
+  return;
+ }
+
+ let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
+  headers:{
+   Authorization: "Bearer " + accessToken
+  }
+ });
+
+ let dados = await res.json();
+
+ ag = dados;
+ salvarLocal();
+ render();
+
+ alert("Dados restaurados 🚀");
+ }
+
+ function conectarDrive(){
+ const client = google.accounts.oauth2.initTokenClient({
+  client_id: "877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com",
+  scope: "https://www.googleapis.com/auth/drive.file",
+  callback: (res)=>{
+   accessToken = res.access_token;
+   alert("Drive conectado 🚀");
+  }
+ });
+
+ client.requestAccessToken();
+}
+ 
+/* LOCAL */
+function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
+function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
+
+/* CRUD */
+function salvar(){
+ if(!cliente.value||!data.value||!hora.value) return alert("Preencha tudo");
+
+ ag.push({
+  id:Date.now(),
+  cliente:cliente.value,
+  tel:tel.value,
+  data:data.value,
+  hora:hora.value,
+  valor:+valor.value||0,
+  pago:false,
+  favorito:false,
+  confirmado:false
+ });
+
+ salvarLocal();
+ render();
+ }
+ function excluir(id){
+ ag=ag.filter(a=>a.id!==id);
+ salvarLocal();
+ render();
+}
+
+function pagar(id){
+ let a=ag.find(x=>x.id===id);
+ a.pago=true;
+ salvarLocal();
+ render();
+}
+
+function favoritar(id){
+ let a=ag.find(x=>x.id===id);
+ a.favorito=!a.favorito;
+ salvarLocal();
+ render();
+}
+
+function confirmar(id){
+ let a=ag.find(x=>x.id===id);
+ a.confirmado=true;
+ salvarLocal();
+ render();
+}
+
+function enviarZap(id){
+ let a=ag.find(x=>x.id===id);
+ if(!a.tel)return alert("Sem telefone");
+ let numero=a.tel.replace(/\D/g,"");
+ let msg=encodeURIComponent("Olá "+a.cliente+" confirme seu horário "+a.hora);
+ window.open("https://wa.me/55"+numero+"?text="+msg);
+ }
+
+ /* GOOGLE DRIVE */
+const CLIENT_ID = "877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com";
+const API_KEY = "AIzaSyBFItoKlSptv86j5Mo1XwwlJSTzJFgQ5No";
+
+ function initGoogle(){
+ gapi.load('client:auth2', async ()=>{
+  await gapi.client.init({
+   apiKey: API_KEY,
+   clientId: CLIENT_ID,
+   discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+   scope: "https://www.googleapis.com/auth/drive.file"
+  });
+  alert("Google conectado!");
+ });
+}
+
+function loginGoogle(){
+ google.accounts.id.initialize({
+  client_id: "877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com",
+  callback: handleCredentialResponse
+ });
+
+ google.accounts.id.prompt();
+}
+
+function handleCredentialResponse(response){
+ console.log("TOKEN:", response.credential);
+
+ alert("Login realizado com sucesso 🚀");
+ }
+
+ async function salvarDrive(){
+ if(!accessToken){
+  alert("Conecte o Drive primeiro");
+  return;
+ }
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ let dadosDrive = [];
+
+ // 🔥 1. BUSCAR DADOS ANTIGOS
+ if(fileId){
+  try{
+   let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
+    headers:{ Authorization:"Bearer "+accessToken }
+   });
+   dadosDrive = await res.json();
+  }catch(e){
+   dadosDrive = [];
+  }
+ }
+
+ // 🔥 2. JUNTAR SEM DUPLICAR
+ let todos = [...dadosDrive, ...ag];
+
+ let unico = [];
+ let ids = new Set();
+
+ todos.forEach(item=>{
+  if(!ids.has(item.id)){
+   ids.add(item.id);
+   unico.push(item);
+  }
+ });
+
+  // 🔥 3. SALVAR
+ let arquivo = new Blob([JSON.stringify(unico)], {type:"application/json"});
+
+ let form = new FormData();
+ form.append("metadata", new Blob([JSON.stringify({
+  name:"agenda_backup.json"
+ })], {type:"application/json"}));
+
+ form.append("file", arquivo);
+
+ let url = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+ let method = "POST";
+
+ if(fileId){
+  url = `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
+  method = "PATCH";
+ }
+
+ let res = await fetch(url,{
+  method:method,
+  headers:{ Authorization:"Bearer "+accessToken },
+  body:form
+ });
+
+ let data = await res.json();
+
+ if(!fileId){
+  localStorage.setItem("drive_file_id", data.id);
+ }
+
+ alert("Backup sincronizado ☁️🚀");
+ }
+
+ 
 const firebaseConfig = {
   apiKey: "AIzaSyDrtZxbKXk7hjlqBL_BLoZMTBdc5iqBCXo",
   authDomain: "ferramentas-projeto.firebaseapp.com",
@@ -79,7 +397,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let ag=[],editId=null;
 
 /* ===== SALVAR ===== */
 async function salvarLocal(){
@@ -197,6 +514,9 @@ function gerarRelatorio(){
   <div class="rel-item">R$ ${mT}<span>Total do mês</span></div>
  </div>`;
 }
+ gerarRelatorio();
+}
+
 
 function render(){
  lista.innerHTML="";
@@ -232,6 +552,36 @@ function render(){
 }
 
 window.onload=()=>carregarLocal();
+ window.onload = ()=>{
+ carregarLocal();
+ render();
+
+ setTimeout(()=>{
+  if(accessToken){
+   carregarDrive();
+  }
+ },2000);
+ }
+
+window.onload = ()=>{
+ carregarLocal();
+ render();
+
+ setTimeout(()=>{
+  syncDrive();
+ },2000);
+ }
+ 
+salvarLocal();
+render();
+
+if(accessToken){
+ salvarDrive();
+ }
+
+ setInterval(()=>{
+ syncDrive();
+}, 10000); // a cada 5 segundos
 </script>
 
 </body>
