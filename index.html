@@ -272,11 +272,6 @@ function loginGoogle(){
  tokenClient.requestAccessToken();
 }
 
-// BACKUP AUTO
-setInterval(()=>{
- if(accessToken) salvarDrive();
-},15000);
-
 // BACKUP
 async function salvarDrive(){
  if(!accessToken) return alert("Faça login primeiro");
