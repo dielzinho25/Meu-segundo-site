@@ -3,48 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agenda Avançada</title>
+
+<title>Agenda PRO</title>
 
 <style>
-body{font-family:Arial;background:#f2f4f8;margin:0}
-header{background:#111;color:#fff;padding:12px;display:flex;justify-content:space-between}
-.card{background:#fff;margin:10px;padding:15px;border-radius:14px}
-input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #ccc}
-button{background:#111;color:#fff;border:0}
+body{font-family:Arial;background:#121212;color:#fff;margin:0}
+.card{background:#1e1e1e;margin:10px;padding:15px;border-radius:14px}
+input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:none}
+input,select{background:#2a2a2a;color:#fff}
+button{background:#2e7d32;color:#fff;font-weight:bold}
 
-.ok{background:#2e7d32}
-.warn{background:#f9a825;color:#000}
-.danger{background:#c62828}
+.ag{background:#2a2a2a;margin-top:8px;padding:10px;border-radius:10px}
 
-.ag{background:#fafafa;border-left:5px solid #1565c0;margin-top:8px;padding:10px;border-radius:10px}
-.ag.pago{border-left-color:#2e7d32}
+/* botão flutuante */
+#btnConfig{
+ position:fixed;
+ right:15px;
+ bottom:20px;
+ width:55px;
+ height:55px;
+ border-radius:50%;
+ background:#2e7d32;
+ color:#fff;
+ font-size:22px;
+ border:none;
+ z-index:999;
+}
 
-.rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.rel-item{padding:10px;border-radius:10px;background:#f0f0f0;text-align:center;font-weight:bold}
-.rel-item span{display:block;font-size:12px}
+/* box config */
+#boxDrive{display:none}
 
-/* DARK MODE FIX */
-body.dark{background:#121212;color:#e0e0e0}
-body.dark header{background:#000}
-body.dark .card{background:#1e1e1e}
-body.dark input,body.dark select{background:#2a2a2a;color:#fff;border:1px solid #444}
-body.dark .rel-item{background:#2a2a2a;color:#fff}
-body.dark .ag{background:#1e1e1e;color:#fff}
-body.dark button{background:#333;color:#fff}
-body.dark .ok{background:#2e7d32}
-body.dark .warn{background:#f9a825;color:#000}
-body.dark .danger{background:#c62828}
-
-#btnConfig{position:fixed;right:15px;bottom:20px;width:55px;height:55px;border-radius:50%;background:#2e7d32;color:#fff;font-size:22px}
+/* relatório */
+.rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rel-item{background:#2a2a2a;padding:10px;border-radius:10px;text-align:center}
 </style>
 </head>
 
 <body>
-
-<header>
- <b>📅 Agenda Avançada</b>
- <button onclick="toggleTema()">🌙</button>
-</header>
 
 <div class="card">
  <input id="cliente" placeholder="Cliente">
@@ -56,8 +51,9 @@ body.dark .danger{background:#c62828}
 </div>
 
 <div class="card">
- <input id="fBusca" placeholder="Buscar" oninput="render()">
+ <input id="fBusca" placeholder="Buscar nome ou telefone" oninput="render()">
  <input id="fData" type="date" onchange="render()">
+
  <select id="fStatus" onchange="render()">
   <option value="todos">Todos</option>
   <option value="pendente">Pendentes</option>
@@ -66,7 +62,7 @@ body.dark .danger{background:#c62828}
 </div>
 
 <div class="card">
- <b>📊 Relatórios</b>
+ <b>📊 Relatório</b>
  <div id="relatorio"></div>
 </div>
 
@@ -74,71 +70,38 @@ body.dark .danger{background:#c62828}
  <div id="lista"></div>
 </div>
 
-<div id="boxDrive" style="display:none">
- <button onclick="conectarDrive()">🔑 Conectar Drive</button>
- <button onclick="loginGoogle()">🔐 Login</button>
+<!-- CONFIG -->
+<div id="boxDrive" class="card">
  <button onclick="salvarDrive()">☁️ Backup</button>
  <button onclick="carregarDrive()">📥 Restaurar</button>
+ <button onclick="excluirDrive()">🗑 Excluir</button>
 </div>
 
 <button id="btnConfig" onclick="toggleDrive()">⚙️</button>
-
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <script>
 let ag=[];
 let editId=null;
 let accessToken=null;
 
-const CLIENT_ID="877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com";
-
-const firebaseConfig={
- apiKey:"AIzaSyBMQrLWFnEcrf2-6k_CZZfMvCmLYtY6Lf0",
- authDomain:"ferramentas-projeto.firebaseapp.com",
- projectId:"ferramentas-projeto"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
-
-/* TEMA */
-function toggleTema(){
- document.body.classList.toggle("dark");
- localStorage.setItem("tema_dark",document.body.classList.contains("dark"));
-}
-if(localStorage.getItem("tema_dark")==="true"){
- document.body.classList.add("dark");
-}
-
-/* LOCAL + FIREBASE */
+/* LOCAL */
 function salvarLocal(){
- localStorage.setItem("agenda",JSON.stringify(ag));
- ag.forEach(a=>db.collection("agenda").doc(String(a.id)).set(a,{merge:true}));
+ localStorage.setItem("agenda_local",JSON.stringify(ag));
 }
-
 function carregarLocal(){
- ag=JSON.parse(localStorage.getItem("agenda")||"[]");
- db.collection("agenda").onSnapshot(s=>{
-  s.docChanges().forEach(c=>{
-   let d=c.doc.data();
-   let i=ag.findIndex(a=>a.id==d.id);
-   if(c.type==="added"&&i==-1)ag.push(d);
-   if(c.type==="modified"&&i>-1)ag[i]=d;
-   if(c.type==="removed")ag=ag.filter(a=>a.id!=d.id);
-  });
-  salvarLocal();render();
- });
+ ag=JSON.parse(localStorage.getItem("agenda_local")||"[]");
 }
 
-/* CRUD */
+/* SALVAR */
 function salvar(){
- if(!cliente.value||!data.value||!hora.value)return alert("Preencha tudo");
+ if(!cliente.value||!data.value||!hora.value){
+  alert("Preencha tudo");
+  return;
+ }
 
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
-  ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
+  ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value||0};
  }else{
   ag.push({
    id:Date.now(),
@@ -146,174 +109,135 @@ function salvar(){
    tel:tel.value,
    data:data.value,
    hora:hora.value,
-   valor:+valor.value,
-   pago:false,
-   favorito:false
+   valor:+valor.value||0,
+   pago:false
   });
  }
 
- salvarLocal();limpar();render();
+ salvarLocal();
+ render();
+ limpar();
 }
 
-function editar(id){
- let a=ag.find(x=>x.id===id);
- cliente.value=a.cliente;tel.value=a.tel;data.value=a.data;hora.value=a.hora;valor.value=a.valor;
- editId=id;
-}
-
-function excluir(id){
- ag=ag.filter(a=>a.id!==id);
- db.collection("agenda").doc(String(id)).delete();
- salvarLocal();render();
-}
-
-function pagar(id){
- let a=ag.find(x=>x.id===id);
- a.pago=true;
- salvarLocal();render();
-}
-
-function reagendar(id){
- let a=ag.find(x=>x.id===id);
- ag.push({...a,id:Date.now(),pago:false});
- salvarLocal();render();
-}
-
-function favoritar(id){
- let a=ag.find(x=>x.id===id);
- a.favorito=!a.favorito;
- salvarLocal();render();
-}
-
-/* RELATÓRIO */
-function gerarRelatorio(){
- let hoje=fData.value||new Date().toISOString().slice(0,10);
- let mes=hoje.slice(0,7);
-
- let totalDia=0,recebido=0,totalMes=0;
-
- ag.forEach(a=>{
-  if(a.data===hoje){
-   totalDia+=a.valor||0;
-   if(a.pago)recebido+=a.valor||0;
-  }
-  if(a.data&&a.data.slice(0,7)===mes){
-   totalMes+=a.valor||0;
-  }
- });
-
- let pendente=totalDia-recebido;
-
- relatorio.innerHTML=`
- <div class="rel-box">
-  <div class="rel-item">R$ ${totalDia.toFixed(2)}<span>Total do dia</span></div>
-  <div class="rel-item">R$ ${recebido.toFixed(2)}<span>Recebido hoje</span></div>
-  <div class="rel-item">R$ ${pendente.toFixed(2)}<span>Pendente</span></div>
-  <div class="rel-item">R$ ${totalMes.toFixed(2)}<span>Total do mês</span></div>
- </div>`;
+/* LIMPAR */
+function limpar(){
+ cliente.value=tel.value=data.value=hora.value=valor.value="";
+ editId=null;
 }
 
 /* RENDER */
 function render(){
  lista.innerHTML="";
 
+ let busca=fBusca.value.toLowerCase();
+ let dataFiltro=fData.value;
+ let status=fStatus.value;
+
  ag
- .sort((a,b)=>b.favorito-a.favorito)
+ .filter(a=>{
+  if(busca && !a.cliente.toLowerCase().includes(busca) && !(a.tel||"").includes(busca)) return false;
+  if(dataFiltro && a.data!==dataFiltro) return false;
+  if(status==="pago" && !a.pago) return false;
+  if(status==="pendente" && a.pago) return false;
+  return true;
+ })
  .forEach(a=>{
   lista.innerHTML+=`
-  <div class="ag ${a.pago?'pago':''}">
-   <b>${a.data} ${a.hora}</b><br>
-   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}<br>
-
-   <button onclick="favoritar(${a.id})">${a.favorito?"⭐ Favorito":"☆ Favoritar"}</button>
-   <button onclick="editar(${a.id})">✏️</button>
-   <button onclick="pagar(${a.id})">💰</button>
-   <button onclick="reagendar(${a.id})">🔁</button>
-   <button onclick="excluir(${a.id})">🗑</button>
-  </div>`;
+   <div class="ag">
+    <b>${a.data} ${a.hora}</b><br>
+    ${a.cliente} — R$ ${a.valor}<br>
+    ${a.tel||""}<br>
+    ${a.pago?"✅ Pago":"⏳ Pendente"}
+    <br>
+    <button onclick="pagar(${a.id})">💰</button>
+    <button onclick="editar(${a.id})">✏️</button>
+    <button onclick="excluir(${a.id})">🗑</button>
+   </div>
+  `;
  });
 
  gerarRelatorio();
 }
 
-/* GOOGLE */
-function conectarDrive(){
- const client=google.accounts.oauth2.initTokenClient({
-  client_id:CLIENT_ID,
-  scope:"https://www.googleapis.com/auth/drive.file",
-  callback:r=>{accessToken=r.access_token;alert("Drive conectado")}
- });
- client.requestAccessToken();
+/* AÇÕES */
+function editar(id){
+ let a=ag.find(x=>x.id===id);
+ cliente.value=a.cliente;
+ tel.value=a.tel;
+ data.value=a.data;
+ hora.value=a.hora;
+ valor.value=a.valor;
+ editId=id;
 }
 
-function loginGoogle(){
- google.accounts.id.initialize({
-  client_id:CLIENT_ID,
-  callback:()=>alert("Login OK")
- });
- google.accounts.id.prompt();
+function pagar(id){
+ let a=ag.find(x=>x.id===id);
+ a.pago=true;
+ salvarLocal();
+ render();
 }
 
-/* BACKUP */
+function excluir(id){
+ ag=ag.filter(a=>a.id!==id);
+ salvarLocal();
+ render();
+}
+
+/* RELATÓRIO */
+function gerarRelatorio(){
+ let hoje=new Date().toISOString().slice(0,10);
+ let mes=hoje.slice(0,7);
+
+ let dT=0,dP=0,mT=0;
+
+ ag.forEach(a=>{
+  if(a.data===hoje){
+   dT+=a.valor;
+   if(a.pago)dP+=a.valor;
+  }
+  if(a.data.slice(0,7)===mes)mT+=a.valor;
+ });
+
+ relatorio.innerHTML=`
+ <div class="rel-box">
+  <div class="rel-item">R$ ${dT} Dia</div>
+  <div class="rel-item">R$ ${dP} Recebido</div>
+  <div class="rel-item">R$ ${dT-dP} Pendente</div>
+  <div class="rel-item">R$ ${mT} Mês</div>
+ </div>`;
+}
+
+/* CONFIG */
+function toggleDrive(){
+ let box=document.getElementById("boxDrive");
+ box.style.display = box.style.display==="none"?"block":"none";
+}
+
+/* DRIVE (SIMPLES MOCK) */
 async function salvarDrive(){
- if(!accessToken)return alert("Conecte o Drive");
-
- let fileId=localStorage.getItem("drive_file_id");
-
- let arquivo=new Blob([JSON.stringify(ag)],{type:"application/json"});
-
- let form=new FormData();
- form.append("metadata",new Blob([JSON.stringify({name:"agenda_backup.json"})],{type:"application/json"}));
- form.append("file",arquivo);
-
- let url="https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
- let method="POST";
-
- if(fileId){
-  url=`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
-  method="PATCH";
- }
-
- let res=await fetch(url,{method,headers:{Authorization:"Bearer "+accessToken},body:form});
- let data=await res.json();
-
- if(!fileId)localStorage.setItem("drive_file_id",data.id);
-
+ localStorage.setItem("backup_drive",JSON.stringify(ag));
  alert("Backup salvo ☁️");
 }
 
 async function carregarDrive(){
- if(!accessToken)return alert("Conecte o Drive");
-
- let fileId=localStorage.getItem("drive_file_id");
- if(!fileId)return alert("Sem backup");
-
- let res=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
-  headers:{Authorization:"Bearer "+accessToken}
- });
-
- ag=await res.json();
- salvarLocal();render();
-
- alert("Backup restaurado 🚀");
+ let dados=JSON.parse(localStorage.getItem("backup_drive")||"[]");
+ ag=dados;
+ salvarLocal();
+ render();
+ alert("Restaurado 📥");
 }
 
-/* UI */
-function toggleDrive(){
- boxDrive.style.display=boxDrive.style.display==="none"?"block":"none";
-}
-
-function limpar(){
- cliente.value=tel.value=data.value=hora.value=valor.value="";
- editId=null;
+async function excluirDrive(){
+ localStorage.removeItem("backup_drive");
+ alert("Excluído 🗑");
 }
 
 /* INIT */
 window.onload=()=>{
  carregarLocal();
  render();
-};
+}
 </script>
 
 </body>
-</html>
+ </html>
