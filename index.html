@@ -6,13 +6,14 @@
 
 <title>Agenda PRO</title>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <style>
 body{font-family:Arial;background:#121212;color:#fff;margin:0}
 .card{background:#1e1e1e;margin:10px;padding:15px;border-radius:14px}
 input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:none}
 input,select{background:#2a2a2a;color:#fff}
 button{background:#2e7d32;color:#fff;font-weight:bold}
-
 .ag{background:#2a2a2a;margin-top:8px;padding:10px;border-radius:10px}
 
 /* botão flutuante */
@@ -30,10 +31,7 @@ button{background:#2e7d32;color:#fff;font-weight:bold}
  z-index:999;
 }
 
-/* box config */
 #boxDrive{display:none}
-
-/* relatório */
 .rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .rel-item{background:#2a2a2a;padding:10px;border-radius:10px;text-align:center}
 </style>
@@ -51,9 +49,8 @@ button{background:#2e7d32;color:#fff;font-weight:bold}
 </div>
 
 <div class="card">
- <input id="fBusca" placeholder="Buscar nome ou telefone" oninput="render()">
+ <input id="fBusca" placeholder="Buscar" oninput="render()">
  <input id="fData" type="date" onchange="render()">
-
  <select id="fStatus" onchange="render()">
   <option value="todos">Todos</option>
   <option value="pendente">Pendentes</option>
@@ -70,11 +67,10 @@ button{background:#2e7d32;color:#fff;font-weight:bold}
  <div id="lista"></div>
 </div>
 
-<!-- CONFIG -->
 <div id="boxDrive" class="card">
+ <button onclick="loginGoogle()">🔐 Login Google</button>
  <button onclick="salvarDrive()">☁️ Backup</button>
  <button onclick="carregarDrive()">📥 Restaurar</button>
- <button onclick="excluirDrive()">🗑 Excluir</button>
 </div>
 
 <button id="btnConfig" onclick="toggleDrive()">⚙️</button>
@@ -83,21 +79,27 @@ button{background:#2e7d32;color:#fff;font-weight:bold}
 let ag=[];
 let editId=null;
 let accessToken=null;
+let CLIENT_ID="COLOCA_SEU_CLIENT_ID_AQUI";
 
 /* LOCAL */
-function salvarLocal(){
- localStorage.setItem("agenda_local",JSON.stringify(ag));
-}
-function carregarLocal(){
- ag=JSON.parse(localStorage.getItem("agenda_local")||"[]");
+function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
+function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
+
+/* LOGIN GOOGLE */
+function loginGoogle(){
+ google.accounts.oauth2.initTokenClient({
+  client_id: CLIENT_ID,
+  scope: "https://www.googleapis.com/auth/drive.file",
+  callback: (resp)=>{
+   accessToken = resp.access_token;
+   alert("Conectado 🚀");
+  }
+ }).requestAccessToken();
 }
 
 /* SALVAR */
 function salvar(){
- if(!cliente.value||!data.value||!hora.value){
-  alert("Preencha tudo");
-  return;
- }
+ if(!cliente.value||!data.value||!hora.value) return alert("Preencha");
 
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
@@ -116,13 +118,13 @@ function salvar(){
 
  salvarLocal();
  render();
+
+ // 🔥 AUTO BACKUP
+ if(accessToken) salvarDrive();
+
  limpar();
- // 🔥 AUTO ENVIA
-if(accessToken){
- salvarDrive();
 }
 
-/* LIMPAR */
 function limpar(){
  cliente.value=tel.value=data.value=hora.value=valor.value="";
  editId=null;
@@ -132,25 +134,22 @@ function limpar(){
 function render(){
  lista.innerHTML="";
 
- let busca=fBusca.value.toLowerCase();
- let dataFiltro=fData.value;
- let status=fStatus.value;
+ let b=fBusca.value.toLowerCase();
+ let d=fData.value;
+ let s=fStatus.value;
 
- ag
- .filter(a=>{
-  if(busca && !a.cliente.toLowerCase().includes(busca) && !(a.tel||"").includes(busca)) return false;
-  if(dataFiltro && a.data!==dataFiltro) return false;
-  if(status==="pago" && !a.pago) return false;
-  if(status==="pendente" && a.pago) return false;
+ ag.filter(a=>{
+  if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
+  if(d && a.data!==d) return false;
+  if(s==="pago"&&!a.pago) return false;
+  if(s==="pendente"&&a.pago) return false;
   return true;
- })
- .forEach(a=>{
+ }).forEach(a=>{
   lista.innerHTML+=`
    <div class="ag">
     <b>${a.data} ${a.hora}</b><br>
     ${a.cliente} — R$ ${a.valor}<br>
-    ${a.tel||""}<br>
-    ${a.pago?"✅ Pago":"⏳ Pendente"}
+    ${a.pago?"✅ Pago":"⏳"}
     <br>
     <button onclick="pagar(${a.id})">💰</button>
     <button onclick="editar(${a.id})">✏️</button>
@@ -162,7 +161,6 @@ function render(){
  gerarRelatorio();
 }
 
-/* AÇÕES */
 function editar(id){
  let a=ag.find(x=>x.id===id);
  cliente.value=a.cliente;
@@ -203,12 +201,61 @@ function gerarRelatorio(){
 
  relatorio.innerHTML=`
  <div class="rel-box">
-  <div class="rel-item">R$ ${dT} Dia</div>
-  <div class="rel-item">R$ ${dP} Recebido</div>
-  <div class="rel-item">R$ ${dT-dP} Pendente</div>
-  <div class="rel-item">R$ ${mT} Mês</div>
+  <div class="rel-item">R$ ${dT}</div>
+  <div class="rel-item">R$ ${dP}</div>
+  <div class="rel-item">R$ ${dT-dP}</div>
+  <div class="rel-item">R$ ${mT}</div>
  </div>`;
 }
+
+/* DRIVE */
+async function salvarDrive(){
+ let fileId=localStorage.getItem("fileId");
+
+ let arquivo=new Blob([JSON.stringify(ag)],{type:"application/json"});
+ let form=new FormData();
+
+ form.append("metadata", new Blob([JSON.stringify({name:"agenda.json"})],{type:"application/json"}));
+ form.append("file",arquivo);
+
+ let url="https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+ let method="POST";
+
+ if(fileId){
+  url=`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`;
+  method="PATCH";
+ }
+
+ let res=await fetch(url,{
+  method,
+  headers:{Authorization:"Bearer "+accessToken},
+  body:form
+ });
+
+ let data=await res.json();
+
+ if(!fileId) localStorage.setItem("fileId",data.id);
+}
+
+async function carregarDrive(){
+ let fileId=localStorage.getItem("fileId");
+ if(!fileId) return;
+
+ let res=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{
+  headers:{Authorization:"Bearer "+accessToken}
+ });
+
+ ag=await res.json();
+ salvarLocal();
+ render();
+}
+
+/* AUTO SYNC */
+setInterval(()=>{
+ if(accessToken){
+  carregarDrive();
+ }
+},10000);
 
 /* CONFIG */
 function toggleDrive(){
@@ -216,44 +263,12 @@ function toggleDrive(){
  box.style.display = box.style.display==="none"?"block":"none";
 }
 
-/* DRIVE (SIMPLES MOCK) */
-async function salvarDrive(){
- localStorage.setItem("backup_drive",JSON.stringify(ag));
- alert("Backup salvo ☁️");
-}
-
-async function carregarDrive(){
- let dados=JSON.parse(localStorage.getItem("backup_drive")||"[]");
- ag=dados;
- salvarLocal();
- render();
- alert("Restaurado 📥");
-}
-
-async function excluirDrive(){
- localStorage.removeItem("backup_drive");
- alert("Excluído 🗑");
-}
-
 /* INIT */
 window.onload=()=>{
  carregarLocal();
  render();
-
- setTimeout(()=>{
-  if(accessToken){
-   carregarDrive();
-  }
- },2000);
- }
-
- setInterval(()=>{
- if(accessToken){
-  carregarDrive();
- }
-}, 8000); // a cada 8 segundos
- 
+}
 </script>
 
 </body>
- </html>
+</html>
