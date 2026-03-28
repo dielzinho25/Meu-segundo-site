@@ -274,68 +274,87 @@ function loginGoogle(){
 
 // BACKUP
 async function salvarDrive(){
- if(!accessToken) return alert("Faça login primeiro");
-
- let nome = "agenda_backup.json";
-
- let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`, {
-  headers: { Authorization: "Bearer " + accessToken }
- });
-
- let data = await res.json();
- let fileId = data.files?.[0]?.id;
+ if(!accessToken){
+  alert("⚠️ Faça login no Google primeiro");
+  return;
+ }
 
  let conteudo = JSON.stringify(ag);
 
- if(fileId){
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-   method: "PATCH",
-   headers: {
-    Authorization: "Bearer " + accessToken,
-    "Content-Type": "application/json"
-   },
-   body: conteudo
-  });
- } else {
-  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media", {
+ let metadata = {
+  name: "agenda_backup.json",
+  mimeType: "application/json"
+ };
+
+ let form = new FormData();
+ form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+ form.append("file", new Blob([conteudo], { type: "application/json" }));
+
+ try{
+  let res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
    method: "POST",
    headers: {
-    Authorization: "Bearer " + accessToken,
-    "Content-Type": "application/json"
+    Authorization: "Bearer " + accessToken
    },
-   body: conteudo
+   body: form
   });
- }
 
- alert("✅ Backup salvo");
-}
+  let data = await res.json();
+
+  if(data.id){
+   alert("✅ Backup salvo no Drive!");
+  } else {
+   console.log(data);
+   alert("❌ Erro ao salvar");
+  }
+
+ }catch(e){
+  console.error(e);
+  alert("❌ Falha no backup");
+ }
+ }
 
 // RESTAURAR
 async function restaurarDrive(){
- if(!accessToken) return alert("Faça login primeiro");
+ if(!accessToken){
+  alert("⚠️ Faça login primeiro");
+  return;
+ }
 
- let nome = "agenda_backup.json";
+ try{
+  let res = await fetch("https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json'", {
+   headers: {
+    Authorization: "Bearer " + accessToken
+   }
+  });
 
- let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`, {
-  headers: { Authorization: "Bearer " + accessToken }
- });
+  let data = await res.json();
 
- let data = await res.json();
- let fileId = data.files?.[0]?.id;
-
- if(!fileId) return alert("Nenhum backup encontrado");
-
- let file = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-  headers: { Authorization: "Bearer " + accessToken }
- });
-
- ag = await file.json();
-
- salvarLocal();
- render();
-
- alert("✅ Dados restaurados");
+  if(!data.files || data.files.length === 0){
+   alert("❌ Nenhum backup encontrado");
+   return;
   }
+
+  let fileId = data.files[0].id;
+
+  let file = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+   headers: {
+    Authorization: "Bearer " + accessToken
+   }
+  });
+
+  ag = await file.json();
+
+  salvarLocal();
+  render();
+
+  alert("✅ Backup restaurado");
+
+ }catch(e){
+  console.error(e);
+  alert("❌ Erro ao restaurar");
+ }
+}
 
 // INIT
 window.onload=()=>{
