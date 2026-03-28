@@ -9,21 +9,20 @@
 
 <style>
 body{font-family:Arial;background:#121212;color:#fff;margin:0}
-header{background:#000;padding:12px;display:flex;justify-content:space-between}
+header{background:#000;padding:12px}
 .card{background:#1e1e1e;margin:10px;padding:15px;border-radius:14px}
 input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #444;background:#2a2a2a;color:#fff}
-button{background:#2e7d32;border:0;margin-top:5px}
+button{background:#2e7d32;border:0}
 .ag{background:#1e1e1e;margin-top:8px;padding:10px;border-radius:10px;border-left:5px solid #1565c0}
 .ag.pago{border-left-color:#2e7d32}
-.detalhe{font-size:12px;color:#aaa;margin-top:5px}
+.rel-box{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rel-item{background:#2a2a2a;padding:10px;border-radius:10px;text-align:center}
 </style>
 </head>
 
 <body>
 
-<header>
- <b>📅 Agenda PRO</b>
-</header>
+<header><b>📅 Agenda PRO</b></header>
 
 <div class="card">
  <input id="cliente" placeholder="Cliente">
@@ -49,45 +48,16 @@ button{background:#2e7d32;border:0;margin-top:5px}
  <button onclick="restaurarDrive()">📥 Restaurar</button>
 </div>
 
+<div class="card">
+ <b>📊 Relatório</b>
+ <div id="relatorio"></div>
+</div>
+
 <div class="card" id="lista"></div>
 
 <script>
 let ag=[];
 let editId=null;
-
-function gerarRelatorio(){
- let hoje=new Date().toISOString().slice(0,10);
- let mes=hoje.slice(0,7);
-
- let totalDia=0;
- let recebido=0;
- let pendente=0;
- let totalMes=0;
- let qtd=0;
-
- ag.forEach(a=>{
-  if(a.data===hoje){
-   totalDia+=a.valor;
-   if(a.pago) recebido+=a.valor;
-   else pendente+=a.valor;
-  }
-
-  if(a.data.slice(0,7)===mes){
-   totalMes+=a.valor;
-  }
-
-  qtd++;
- });
-
- relatorio.innerHTML=`
- <div class="rel-box">
-  <div class="rel-item">💰 R$ ${totalDia.toFixed(2)}<br><span>Hoje</span></div>
-  <div class="rel-item">✅ R$ ${recebido.toFixed(2)}<br><span>Recebido</span></div>
-  <div class="rel-item">⏳ R$ ${pendente.toFixed(2)}<br><span>Pendente</span></div>
-  <div class="rel-item">📅 R$ ${totalMes.toFixed(2)}<br><span>Mês</span></div>
-  <div class="rel-item">📊 ${qtd}<br><span>Agendamentos</span></div>
- </div>`;
-}
 
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
@@ -105,13 +75,7 @@ function salvar(){
 
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
-  ag[i]={...ag[i],
-   cliente:cliente.value,
-   tel:tel.value,
-   data:data.value,
-   hora:hora.value,
-   valor:+valor.value
-  };
+  ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
  }else{
   ag.push({
    id:Date.now(),
@@ -125,9 +89,10 @@ function salvar(){
   });
  }
 
- salvarLocal();limpar();render();
- if(accessToken){
- salvarDrive();
+ salvarLocal();
+ if(accessToken) salvarDrive();
+ limpar();
+ render();
 }
 
 // EDITAR
@@ -145,7 +110,9 @@ function editar(id){
 function excluir(id){
  if(confirm("Excluir?")){
   ag=ag.filter(a=>a.id!==id);
-  salvarLocal();render();
+  salvarLocal();
+  if(accessToken) salvarDrive();
+  render();
  }
 }
 
@@ -153,42 +120,31 @@ function excluir(id){
 function fav(id){
  let a=ag.find(x=>x.id===id);
  a.favorito=!a.favorito;
- salvarLocal();render();
+ salvarLocal();
+ render();
 }
 
 // PAGAR
 function pagar(id){
  let a=ag.find(x=>x.id===id);
  a.pago=true;
- salvarLocal();render();
+ salvarLocal();
+ render();
 }
 
 // REAGENDAR
 function reagendar(id){
- let novaData = prompt("Nova data (AAAA-MM-DD)");
- let novaHora = prompt("Nova hora (HH:MM)");
+ let d=prompt("Nova data (AAAA-MM-DD)");
+ let h=prompt("Nova hora (HH:MM)");
+ if(!d||!h)return;
 
- if(!novaData || !novaHora) return;
+ let a=ag.find(x=>x.id===id);
 
- let a = ag.find(x=>x.id===id);
-
- let novo = {
-  ...a,
-  id: Date.now(),
-  data: novaData,
-  hora: novaHora,
-  pago:false
- };
-
- ag.push(novo);
+ ag.push({...a,id:Date.now(),data:d,hora:h,pago:false});
 
  salvarLocal();
+ if(accessToken) salvarDrive();
  render();
-
- // 🔥 salva automático no Drive
- if(accessToken){
-  salvarDrive();
- }
 }
 
 // DETALHES
@@ -196,58 +152,83 @@ function verDetalhes(id){
  let a=ag.find(x=>x.id===id);
 
  alert(
- "👤 Cliente: "+a.cliente+
- "\n📞 Tel: "+a.tel+
- "\n📅 Data: "+a.data+
- "\n⏰ Hora: "+a.hora+
- "\n💰 Valor: R$ "+a.valor+
- "\n⭐ Favorito: "+(a.favorito?"Sim":"Não")+
- "\n💵 Pago: "+(a.pago?"Sim":"Não")
+ "👤 "+a.cliente+
+ "\n📞 "+a.tel+
+ "\n📅 "+a.data+
+ "\n⏰ "+a.hora+
+ "\n💰 R$ "+a.valor+
+ "\n⭐ "+(a.favorito?"Sim":"Não")+
+ "\n💵 "+(a.pago?"Pago":"Pendente")
  );
 }
 
-// RENDER
+// RELATÓRIO
+function gerarRelatorio(){
+ let hoje=new Date().toISOString().slice(0,10);
+ let mes=hoje.slice(0,7);
+
+ let totalDia=0, recebido=0, pendente=0, totalMes=0, qtd=0;
+
+ ag.forEach(a=>{
+  if(a.data===hoje){
+   totalDia+=a.valor;
+   if(a.pago) recebido+=a.valor;
+   else pendente+=a.valor;
+  }
+  if(a.data.slice(0,7)===mes) totalMes+=a.valor;
+  qtd++;
+ });
+
+ relatorio.innerHTML=`
+ <div class="rel-box">
+  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
+  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
+  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
+  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
+  <div class="rel-item">${qtd}<br>Agendamentos</div>
+ </div>`;
+}
+
+// RENDER (ATUALIZADO)
 function render(){
  lista.innerHTML="";
 
  ag
  .filter(a=>{
   let b=busca.value.toLowerCase();
-  if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
-  if(status.value==="pago" && !a.pago) return false;
-  if(status.value==="pendente" && a.pago) return false;
+  if(b&&!a.cliente.toLowerCase().includes(b)&&!(a.tel||"").includes(b))return false;
+  if(status.value==="pago"&&!a.pago)return false;
+  if(status.value==="pendente"&&a.pago)return false;
   return true;
  })
- // 🔥 AQUI É A PARTE NOVA
  .sort((a,b)=>b.favorito - a.favorito || a.hora.localeCompare(b.hora))
  .forEach(a=>{
   lista.innerHTML+=`
   <div class="ag ${a.pago?'pago':''}">
    <b>${a.data} ${a.hora}</b><br>
    ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}
+   <div>${a.tel||""}</div>
 
-   <div class="detalhe">${a.tel||""}</div>
-
-   <button onclick="verDetalhes(${a.id})">👁 Ver</button>
-   <button onclick="editar(${a.id})">✏️ Editar</button>
+   <button onclick="verDetalhes(${a.id})">👁</button>
+   <button onclick="editar(${a.id})">✏️</button>
    <button onclick="pagar(${a.id})">💰</button>
    <button onclick="fav(${a.id})">⭐</button>
    <button onclick="reagendar(${a.id})">🔁</button>
    <button onclick="excluir(${a.id})">🗑</button>
   </div>`;
  });
- }
+
+ gerarRelatorio();
+}
 
 // NOTIFICAÇÃO
+function ativarNotif(){
+ if(Notification.permission!=="granted") Notification.requestPermission();
+}
+
 function notificar(t,c){
  if(Notification.permission==="granted"){
   new Notification(t,{body:c});
- }
-}
-
-function ativarNotif(){
- if(Notification.permission!=="granted"){
-  Notification.requestPermission();
  }
 }
 
@@ -285,10 +266,13 @@ function loginGoogle(){
  tokenClient.requestAccessToken();
 }
 
+// BACKUP AUTO
+setInterval(()=>{
+ if(accessToken) salvarDrive();
+},15000);
+
 // BACKUP
 async function salvarDrive(){
- if(!accessToken)return alert("Login primeiro");
-
  let nome="agenda_backup.json";
 
  let res=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`,
@@ -316,14 +300,10 @@ async function salvarDrive(){
    body:form
   });
  }
-
- alert("☁️ Backup atualizado");
 }
 
 // RESTAURAR
 async function restaurarDrive(){
- if(!accessToken)return alert("Login primeiro");
-
  let nome="agenda_backup.json";
 
  let res=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`,
@@ -332,16 +312,12 @@ async function restaurarDrive(){
  let data=await res.json();
  let fileId=data.files?.[0]?.id;
 
- if(!fileId)return alert("Sem backup");
-
  let file=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
  {headers:{Authorization:"Bearer "+accessToken}});
 
  ag=await file.json();
-
- salvarLocal();render();
-
- alert("📥 Restaurado");
+ salvarLocal();
+ render();
 }
 
 // INIT
@@ -354,13 +330,7 @@ window.onload=()=>{
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
-setInterval(()=>{
- if(accessToken){
-  salvarDrive();
- }
-},15000); // a cada 15 segundos
- 
 </script>
 
 </body>
-</html>
+ </html>
