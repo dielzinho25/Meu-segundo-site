@@ -117,6 +117,9 @@ function salvar(){
  salvarLocal();
  render();
  limpar();
+ // 🔥 AUTO ENVIA
+if(accessToken){
+ salvarDrive();
 }
 
 /* LIMPAR */
@@ -236,7 +239,20 @@ async function excluirDrive(){
 window.onload=()=>{
  carregarLocal();
  render();
-}
+
+ setTimeout(()=>{
+  if(accessToken){
+   carregarDrive();
+  }
+ },2000);
+ }
+
+ setInterval(()=>{
+ if(accessToken){
+  carregarDrive();
+ }
+}, 8000); // a cada 8 segundos
+ 
 </script>
 
 </body>
