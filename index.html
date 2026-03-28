@@ -55,6 +55,40 @@ button{background:#2e7d32;border:0;margin-top:5px}
 let ag=[];
 let editId=null;
 
+function gerarRelatorio(){
+ let hoje=new Date().toISOString().slice(0,10);
+ let mes=hoje.slice(0,7);
+
+ let totalDia=0;
+ let recebido=0;
+ let pendente=0;
+ let totalMes=0;
+ let qtd=0;
+
+ ag.forEach(a=>{
+  if(a.data===hoje){
+   totalDia+=a.valor;
+   if(a.pago) recebido+=a.valor;
+   else pendente+=a.valor;
+  }
+
+  if(a.data.slice(0,7)===mes){
+   totalMes+=a.valor;
+  }
+
+  qtd++;
+ });
+
+ relatorio.innerHTML=`
+ <div class="rel-box">
+  <div class="rel-item">💰 R$ ${totalDia.toFixed(2)}<br><span>Hoje</span></div>
+  <div class="rel-item">✅ R$ ${recebido.toFixed(2)}<br><span>Recebido</span></div>
+  <div class="rel-item">⏳ R$ ${pendente.toFixed(2)}<br><span>Pendente</span></div>
+  <div class="rel-item">📅 R$ ${totalMes.toFixed(2)}<br><span>Mês</span></div>
+  <div class="rel-item">📊 ${qtd}<br><span>Agendamentos</span></div>
+ </div>`;
+}
+
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
 function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
@@ -92,6 +126,8 @@ function salvar(){
  }
 
  salvarLocal();limpar();render();
+ if(accessToken){
+ salvarDrive();
 }
 
 // EDITAR
@@ -129,15 +165,30 @@ function pagar(id){
 
 // REAGENDAR
 function reagendar(id){
- let d=prompt("Nova data (AAAA-MM-DD)");
- let h=prompt("Nova hora (HH:MM)");
- if(!d||!h)return;
+ let novaData = prompt("Nova data (AAAA-MM-DD)");
+ let novaHora = prompt("Nova hora (HH:MM)");
 
- let a=ag.find(x=>x.id===id);
+ if(!novaData || !novaHora) return;
 
- ag.push({...a,id:Date.now(),data:d,hora:h,pago:false});
+ let a = ag.find(x=>x.id===id);
 
- salvarLocal();render();
+ let novo = {
+  ...a,
+  id: Date.now(),
+  data: novaData,
+  hora: novaHora,
+  pago:false
+ };
+
+ ag.push(novo);
+
+ salvarLocal();
+ render();
+
+ // 🔥 salva automático no Drive
+ if(accessToken){
+  salvarDrive();
+ }
 }
 
 // DETALHES
@@ -162,12 +213,13 @@ function render(){
  ag
  .filter(a=>{
   let b=busca.value.toLowerCase();
-  if(b&&!a.cliente.toLowerCase().includes(b)&&!(a.tel||"").includes(b))return false;
-  if(status.value==="pago"&&!a.pago)return false;
-  if(status.value==="pendente"&&a.pago)return false;
+  if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
+  if(status.value==="pago" && !a.pago) return false;
+  if(status.value==="pendente" && a.pago) return false;
   return true;
  })
- .sort((a,b)=>b.favorito-a.favorito)
+ // 🔥 AQUI É A PARTE NOVA
+ .sort((a,b)=>b.favorito - a.favorito || a.hora.localeCompare(b.hora))
  .forEach(a=>{
   lista.innerHTML+=`
   <div class="ag ${a.pago?'pago':''}">
@@ -184,7 +236,7 @@ function render(){
    <button onclick="excluir(${a.id})">🗑</button>
   </div>`;
  });
-}
+ }
 
 // NOTIFICAÇÃO
 function notificar(t,c){
@@ -302,6 +354,12 @@ window.onload=()=>{
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
+setInterval(()=>{
+ if(accessToken){
+  salvarDrive();
+ }
+},15000); // a cada 15 segundos
+ 
 </script>
 
 </body>
