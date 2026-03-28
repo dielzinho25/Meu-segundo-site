@@ -12,9 +12,10 @@ body{font-family:Arial;background:#121212;color:#fff;margin:0}
 header{background:#000;padding:12px;display:flex;justify-content:space-between}
 .card{background:#1e1e1e;margin:10px;padding:15px;border-radius:14px}
 input,select,button{width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #444;background:#2a2a2a;color:#fff}
-button{background:#2e7d32;border:0}
+button{background:#2e7d32;border:0;margin-top:5px}
 .ag{background:#1e1e1e;margin-top:8px;padding:10px;border-radius:10px;border-left:5px solid #1565c0}
 .ag.pago{border-left-color:#2e7d32}
+.detalhe{font-size:12px;color:#aaa;margin-top:5px}
 </style>
 </head>
 
@@ -52,24 +53,64 @@ button{background:#2e7d32;border:0}
 
 <script>
 let ag=[];
+let editId=null;
 
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
 function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
 
-// SALVAR
+// LIMPAR
+function limpar(){
+ cliente.value=tel.value=data.value=hora.value=valor.value="";
+ editId=null;
+}
+
+// SALVAR / EDITAR
 function salvar(){
- ag.push({
-  id:Date.now(),
-  cliente:cliente.value,
-  tel:tel.value,
-  data:data.value,
-  hora:hora.value,
-  valor:+valor.value,
-  pago:false,
-  favorito:false
- });
- salvarLocal();render();
+ if(!cliente.value||!data.value||!hora.value)return alert("Preencha tudo");
+
+ if(editId){
+  let i=ag.findIndex(a=>a.id===editId);
+  ag[i]={...ag[i],
+   cliente:cliente.value,
+   tel:tel.value,
+   data:data.value,
+   hora:hora.value,
+   valor:+valor.value
+  };
+ }else{
+  ag.push({
+   id:Date.now(),
+   cliente:cliente.value,
+   tel:tel.value,
+   data:data.value,
+   hora:hora.value,
+   valor:+valor.value,
+   pago:false,
+   favorito:false
+  });
+ }
+
+ salvarLocal();limpar();render();
+}
+
+// EDITAR
+function editar(id){
+ let a=ag.find(x=>x.id===id);
+ cliente.value=a.cliente;
+ tel.value=a.tel;
+ data.value=a.data;
+ hora.value=a.hora;
+ valor.value=a.valor;
+ editId=id;
+}
+
+// EXCLUIR
+function excluir(id){
+ if(confirm("Excluir?")){
+  ag=ag.filter(a=>a.id!==id);
+  salvarLocal();render();
+ }
 }
 
 // FAVORITO
@@ -88,21 +129,40 @@ function pagar(id){
 
 // REAGENDAR
 function reagendar(id){
- let d=prompt("Nova data");
- let h=prompt("Nova hora");
+ let d=prompt("Nova data (AAAA-MM-DD)");
+ let h=prompt("Nova hora (HH:MM)");
  if(!d||!h)return;
+
  let a=ag.find(x=>x.id===id);
+
  ag.push({...a,id:Date.now(),data:d,hora:h,pago:false});
+
  salvarLocal();render();
+}
+
+// DETALHES
+function verDetalhes(id){
+ let a=ag.find(x=>x.id===id);
+
+ alert(
+ "👤 Cliente: "+a.cliente+
+ "\n📞 Tel: "+a.tel+
+ "\n📅 Data: "+a.data+
+ "\n⏰ Hora: "+a.hora+
+ "\n💰 Valor: R$ "+a.valor+
+ "\n⭐ Favorito: "+(a.favorito?"Sim":"Não")+
+ "\n💵 Pago: "+(a.pago?"Sim":"Não")
+ );
 }
 
 // RENDER
 function render(){
  lista.innerHTML="";
+
  ag
  .filter(a=>{
   let b=busca.value.toLowerCase();
-  if(b&&!a.cliente.toLowerCase().includes(b))return false;
+  if(b&&!a.cliente.toLowerCase().includes(b)&&!(a.tel||"").includes(b))return false;
   if(status.value==="pago"&&!a.pago)return false;
   if(status.value==="pendente"&&a.pago)return false;
   return true;
@@ -111,11 +171,17 @@ function render(){
  .forEach(a=>{
   lista.innerHTML+=`
   <div class="ag ${a.pago?'pago':''}">
-   ${a.favorito?"⭐":""} ${a.cliente} - ${a.data} ${a.hora}<br>
-   R$ ${a.valor}
-   <button onclick="fav(${a.id})">⭐</button>
+   <b>${a.data} ${a.hora}</b><br>
+   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}
+
+   <div class="detalhe">${a.tel||""}</div>
+
+   <button onclick="verDetalhes(${a.id})">👁 Ver</button>
+   <button onclick="editar(${a.id})">✏️ Editar</button>
    <button onclick="pagar(${a.id})">💰</button>
+   <button onclick="fav(${a.id})">⭐</button>
    <button onclick="reagendar(${a.id})">🔁</button>
+   <button onclick="excluir(${a.id})">🗑</button>
   </div>`;
  });
 }
@@ -133,7 +199,6 @@ function ativarNotif(){
  }
 }
 
-// AUTO ALERTA
 setInterval(()=>{
  let agora=new Date();
  ag.forEach(a=>{
@@ -156,6 +221,7 @@ function initGoogle(){
   client_id:CLIENT_ID,
   scope:"https://www.googleapis.com/auth/drive.file",
   callback:(res)=>{
+   if(res.error)return alert("Erro login");
    accessToken=res.access_token;
    localStorage.setItem("token",accessToken);
    alert("Login OK");
@@ -198,7 +264,8 @@ async function salvarDrive(){
    body:form
   });
  }
- alert("Backup OK");
+
+ alert("☁️ Backup atualizado");
 }
 
 // RESTAURAR
@@ -213,11 +280,16 @@ async function restaurarDrive(){
  let data=await res.json();
  let fileId=data.files?.[0]?.id;
 
+ if(!fileId)return alert("Sem backup");
+
  let file=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
  {headers:{Authorization:"Bearer "+accessToken}});
 
  ag=await file.json();
+
  salvarLocal();render();
+
+ alert("📥 Restaurado");
 }
 
 // INIT
@@ -226,10 +298,11 @@ window.onload=()=>{
  render();
  initGoogle();
  ativarNotif();
+
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
 </script>
 
 </body>
- </html>
+</html>
