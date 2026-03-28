@@ -126,26 +126,32 @@ function fav(id){
 
 // PAGAR
 function pagar(id){
- let a=ag.find(x=>x.id===id);
- a.pago=true;
- salvarLocal();
- render();
-}
+ let a = ag.find(x => x.id === id);
 
-// REAGENDAR
-function reagendar(id){
- let d=prompt("Nova data (AAAA-MM-DD)");
- let h=prompt("Nova hora (HH:MM)");
- if(!d||!h)return;
-
- let a=ag.find(x=>x.id===id);
-
- ag.push({...a,id:Date.now(),data:d,hora:h,pago:false});
+ a.pago = !a.pago; // alterna
 
  salvarLocal();
  if(accessToken) salvarDrive();
  render();
-}
+ }
+
+// REAGENDAR
+function reagendar(id){
+ let a = ag.find(x => x.id === id);
+
+ ag.push({
+  ...a,
+  id: Date.now(),
+  pago: false,
+  favorito: false
+ });
+
+ salvarLocal();
+ if(accessToken) salvarDrive();
+ render();
+
+ alert("✅ Cópia criada, agora você pode editar");
+ }
 
 // DETALHES
 function verDetalhes(id){
@@ -273,52 +279,68 @@ setInterval(()=>{
 
 // BACKUP
 async function salvarDrive(){
- let nome="agenda_backup.json";
+ if(!accessToken) return alert("Faça login primeiro");
 
- let res=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`,
- {headers:{Authorization:"Bearer "+accessToken}});
+ let nome = "agenda_backup.json";
 
- let data=await res.json();
- let fileId=data.files?.[0]?.id;
+ let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`, {
+  headers: { Authorization: "Bearer " + accessToken }
+ });
 
- let conteudo=JSON.stringify(ag);
+ let data = await res.json();
+ let fileId = data.files?.[0]?.id;
+
+ let conteudo = JSON.stringify(ag);
 
  if(fileId){
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{
-   method:"PATCH",
-   headers:{Authorization:"Bearer "+accessToken},
-   body:conteudo
+  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+   method: "PATCH",
+   headers: {
+    Authorization: "Bearer " + accessToken,
+    "Content-Type": "application/json"
+   },
+   body: conteudo
   });
- }else{
-  let form=new FormData();
-  form.append("metadata",new Blob([JSON.stringify({name:nome})],{type:"application/json"}));
-  form.append("file",new Blob([conteudo],{type:"application/json"}));
-
-  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
-   method:"POST",
-   headers:{Authorization:"Bearer "+accessToken},
-   body:form
+ } else {
+  await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media", {
+   method: "POST",
+   headers: {
+    Authorization: "Bearer " + accessToken,
+    "Content-Type": "application/json"
+   },
+   body: conteudo
   });
  }
+
+ alert("✅ Backup salvo");
 }
 
 // RESTAURAR
 async function restaurarDrive(){
- let nome="agenda_backup.json";
+ if(!accessToken) return alert("Faça login primeiro");
 
- let res=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`,
- {headers:{Authorization:"Bearer "+accessToken}});
+ let nome = "agenda_backup.json";
 
- let data=await res.json();
- let fileId=data.files?.[0]?.id;
+ let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${nome}'`, {
+  headers: { Authorization: "Bearer " + accessToken }
+ });
 
- let file=await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
- {headers:{Authorization:"Bearer "+accessToken}});
+ let data = await res.json();
+ let fileId = data.files?.[0]?.id;
 
- ag=await file.json();
+ if(!fileId) return alert("Nenhum backup encontrado");
+
+ let file = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+  headers: { Authorization: "Bearer " + accessToken }
+ });
+
+ ag = await file.json();
+
  salvarLocal();
  render();
-}
+
+ alert("✅ Dados restaurados");
+  }
 
 // INIT
 window.onload=()=>{
@@ -330,6 +352,11 @@ window.onload=()=>{
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
+
+ if ("serviceWorker" in navigator) {
+ navigator.serviceWorker.register("sw.js");
+ }
+ 
 </script>
 
 </body>
