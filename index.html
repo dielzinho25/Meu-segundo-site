@@ -128,7 +128,7 @@ function fav(id){
 function pagar(id){
  let a = ag.find(x => x.id === id);
 
- a.pago = !a.pago; // alterna
+ a.pago = !a.pago;
 
  salvarLocal();
  if(accessToken) salvarDrive();
@@ -229,25 +229,25 @@ function render(){
 
 // NOTIFICAÇÃO
 function ativarNotif(){
- if(Notification.permission!=="granted") Notification.requestPermission();
-}
-
-function notificar(t,c){
- if(Notification.permission==="granted"){
-  new Notification(t,{body:c});
+ if(Notification.permission !== "granted"){
+  Notification.requestPermission();
  }
 }
 
-setInterval(()=>{
- let agora=new Date();
- ag.forEach(a=>{
-  let d=new Date(a.data+"T"+a.hora);
-  let diff=(d-agora)/60000;
-  if(diff>9&&diff<10){
-   notificar("⏰ Atendimento",a.cliente+" às "+a.hora);
-  }
- });
-},60000);
+function notificar(titulo, corpo){
+ if(Notification.permission === "granted"){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+   if(reg){
+    reg.showNotification(titulo,{
+     body:corpo,
+     icon:"https://cdn-icons-png.flaticon.com/512/1827/1827392.png"
+    });
+   }else{
+    new Notification(titulo,{body:corpo});
+   }
+  });
+ }
+}
 
 // GOOGLE
 let tokenClient;
@@ -274,88 +274,72 @@ function loginGoogle(){
 
 // BACKUP
 async function salvarDrive(){
- if(!accessToken){
-  alert("⚠️ Faça login no Google primeiro");
-  return;
- }
+ if(!accessToken) return alert("Login primeiro");
+
+ let fileId = localStorage.getItem("drive_file_id");
 
  let conteudo = JSON.stringify(ag);
 
- let metadata = {
-  name: "agenda_backup.json",
-  mimeType: "application/json"
- };
-
- let form = new FormData();
- form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
- form.append("file", new Blob([conteudo], { type: "application/json" }));
-
- try{
-  let res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-   method: "POST",
+ // SE JÁ EXISTE → ATUALIZA
+ if(fileId){
+  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+   method: "PATCH",
    headers: {
-    Authorization: "Bearer " + accessToken
+    Authorization: "Bearer " + accessToken,
+    "Content-Type": "application/json"
    },
-   body: form
+   body: conteudo
   });
 
-  let data = await res.json();
+  console.log("Atualizado mesmo arquivo");
+  return;
+ }
 
-  if(data.id){
-   alert("✅ Backup salvo no Drive!");
-  } else {
-   console.log(data);
-   alert("❌ Erro ao salvar");
-  }
+ // SE NÃO EXISTE → CRIA
+ let res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media", {
+  method: "POST",
+  headers: {
+   Authorization: "Bearer " + accessToken,
+   "Content-Type": "application/json"
+  },
+  body: conteudo
+ });
 
- }catch(e){
-  console.error(e);
-  alert("❌ Falha no backup");
+ let data = await res.json();
+
+ if(data.id){
+  localStorage.setItem("drive_file_id", data.id);
+  console.log("Arquivo criado:", data.id);
+  alert("Backup criado ☁️");
+ }else{
+  console.log(data);
+  alert("Erro ao salvar");
  }
  }
 
 // RESTAURAR
 async function restaurarDrive(){
- if(!accessToken){
-  alert("⚠️ Faça login primeiro");
+ if(!accessToken) return alert("Login primeiro");
+
+ let fileId = localStorage.getItem("drive_file_id");
+
+ if(!fileId){
+  alert("Nenhum backup encontrado");
   return;
  }
 
- try{
-  let res = await fetch("https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json'", {
-   headers: {
-    Authorization: "Bearer " + accessToken
-   }
-  });
+ let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+  headers: { Authorization: "Bearer " + accessToken }
+ });
 
-  let data = await res.json();
+ ag = await res.json();
 
-  if(!data.files || data.files.length === 0){
-   alert("❌ Nenhum backup encontrado");
-   return;
-  }
+ salvarLocal();
+ render();
 
-  let fileId = data.files[0].id;
-
-  let file = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-   headers: {
-    Authorization: "Bearer " + accessToken
-   }
-  });
-
-  ag = await file.json();
-
-  salvarLocal();
-  render();
-
-  alert("✅ Backup restaurado");
-
- }catch(e){
-  console.error(e);
-  alert("❌ Erro ao restaurar");
+ alert("Backup restaurado 📥");
  }
-}
-
+ 
 // INIT
 window.onload=()=>{
  carregarLocal();
