@@ -278,45 +278,94 @@ async function salvarDrive(){
 
  let fileId = localStorage.getItem("drive_file_id");
 
+ let pastaId = await criarPasta();
+
  let conteudo = JSON.stringify(ag);
 
- // SE JÁ EXISTE → ATUALIZA
+ // 🔥 ATUALIZA
  if(fileId){
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-   method: "PATCH",
-   headers: {
-    Authorization: "Bearer " + accessToken,
-    "Content-Type": "application/json"
+  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{
+   method:"PATCH",
+   headers:{
+    Authorization:"Bearer "+accessToken,
+    "Content-Type":"application/json"
    },
-   body: conteudo
+   body:conteudo
   });
 
-  console.log("Atualizado mesmo arquivo");
+  console.log("Atualizado na pasta");
   return;
  }
 
- // SE NÃO EXISTE → CRIA
- let res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media", {
-  method: "POST",
-  headers: {
-   Authorization: "Bearer " + accessToken,
-   "Content-Type": "application/json"
+ // 🔥 CRIA DENTRO DA PASTA
+ let res = await fetch("https://www.googleapis.com/drive/v3/files",{
+  method:"POST",
+  headers:{
+   Authorization:"Bearer "+accessToken,
+   "Content-Type":"application/json"
   },
-  body: conteudo
+  body:JSON.stringify({
+   name:"agenda_backup.json",
+   parents:[pastaId]
+  })
  });
 
  let data = await res.json();
 
- if(data.id){
-  localStorage.setItem("drive_file_id", data.id);
-  console.log("Arquivo criado:", data.id);
-  alert("Backup criado ☁️");
- }else{
-  console.log(data);
-  alert("Erro ao salvar");
+ // upload conteúdo
+ await fetch(`https://www.googleapis.com/upload/drive/v3/files/${data.id}?uploadType=media`,{
+  method:"PATCH",
+  headers:{
+   Authorization:"Bearer "+accessToken,
+   "Content-Type":"application/json"
+  },
+  body:conteudo
+ });
+
+ localStorage.setItem("drive_file_id",data.id);
+
+ alert("☁️ Salvo na pasta AgendaApp");
  }
+ 
+// vai criar a pasta//
+ async function criarPasta(){
+ let nome = "AgendaApp";
+
+ let res = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nome}' and mimeType='application/vnd.google-apps.folder'`,
+  {
+   headers:{ Authorization:"Bearer "+accessToken }
+  }
+ );
+
+ let data = await res.json();
+
+ if(data.files.length > 0){
+  return data.files[0].id;
  }
 
+ // cria pasta
+ let pasta = await fetch(
+  "https://www.googleapis.com/drive/v3/files",
+  {
+   method:"POST",
+   headers:{
+    Authorization:"Bearer "+accessToken,
+    "Content-Type":"application/json"
+   },
+   body: JSON.stringify({
+    name:nome,
+    mimeType:"application/vnd.google-apps.folder"
+   })
+  }
+ );
+
+ let nova = await pasta.json();
+
+ return nova.id;
+}
+
+ 
 // RESTAURAR
 async function restaurarDrive(){
  if(!accessToken) return alert("Login primeiro");
@@ -346,7 +395,23 @@ window.onload=()=>{
  render();
  initGoogle();
  ativarNotif();
+document.addEventListener("click", ()=>{
+ Notification.requestPermission();
+});
 
+ setInterval(()=>{
+ let agora = new Date();
+
+ ag.forEach(a=>{
+  let d = new Date(a.data+"T"+a.hora);
+  let diff = (d - agora)/60000;
+
+  if(diff > 0 && diff < 1){
+   alert("⏰ Atendimento agora: " + a.cliente);
+  }
+ });
+},30000);
+ 
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
