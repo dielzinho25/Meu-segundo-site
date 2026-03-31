@@ -429,23 +429,7 @@ window.onload=()=>{
  render();
  initGoogle();
  ativarNotif();
-document.addEventListener("click", ()=>{
- Notification.requestPermission();
-});
 
- setInterval(()=>{
- let agora = new Date();
-
- ag.forEach(a=>{
-  let d = new Date(a.data+"T"+a.hora);
-  let diff = (d - agora)/60000;
-
-  if(diff > 0 && diff < 1){
-   alert("⏰ Atendimento agora: " + a.cliente);
-  }
- });
-},30000);
- 
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
 }
