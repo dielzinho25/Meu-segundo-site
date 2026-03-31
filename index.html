@@ -274,119 +274,153 @@ function loginGoogle(){
 
 // BACKUP
 async function salvarDrive(){
- if(!accessToken) return alert("Login primeiro");
-
- let fileId = localStorage.getItem("drive_file_id");
-
- let pastaId = await criarPasta();
-
- let conteudo = JSON.stringify(ag);
-
- // 🔥 ATUALIZA
- if(fileId){
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{
-   method:"PATCH",
-   headers:{
-    Authorization:"Bearer "+accessToken,
-    "Content-Type":"application/json"
-   },
-   body:conteudo
-  });
-
-  console.log("Atualizado na pasta");
+async function salvarDrive(){
+ if(!accessToken){
+  alert("Faça login primeiro");
   return;
  }
 
- // 🔥 CRIA DENTRO DA PASTA
- let res = await fetch("https://www.googleapis.com/drive/v3/files",{
-  method:"POST",
-  headers:{
-   Authorization:"Bearer "+accessToken,
-   "Content-Type":"application/json"
-  },
-  body:JSON.stringify({
-   name:"agenda_backup.json",
-   parents:[pastaId]
-  })
- });
+ let nomePasta = "AgendaApp";
 
- let data = await res.json();
-
- // upload conteúdo
- await fetch(`https://www.googleapis.com/upload/drive/v3/files/${data.id}?uploadType=media`,{
-  method:"PATCH",
-  headers:{
-   Authorization:"Bearer "+accessToken,
-   "Content-Type":"application/json"
-  },
-  body:conteudo
- });
-
- localStorage.setItem("drive_file_id",data.id);
-
- alert("☁️ Salvo na pasta AgendaApp");
- }
- 
-// vai criar a pasta//
- async function criarPasta(){
- let nome = "AgendaApp";
-
+ // 🔍 1. BUSCAR OU CRIAR PASTA
  let res = await fetch(
-  `https://www.googleapis.com/drive/v3/files?q=name='${nome}' and mimeType='application/vnd.google-apps.folder'`,
-  {
-   headers:{ Authorization:"Bearer "+accessToken }
-  }
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
  );
 
  let data = await res.json();
+ let pastaId;
 
  if(data.files.length > 0){
-  return data.files[0].id;
+  pastaId = data.files[0].id;
+ }else{
+  let pasta = await fetch(
+   "https://www.googleapis.com/drive/v3/files",
+   {
+    method:"POST",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body: JSON.stringify({
+     name:nomePasta,
+     mimeType:"application/vnd.google-apps.folder"
+    })
+   }
+  );
+
+  let nova = await pasta.json();
+  pastaId = nova.id;
  }
 
- // cria pasta
- let pasta = await fetch(
-  "https://www.googleapis.com/drive/v3/files",
+ // 🔥 2. VER SE JÁ EXISTE ARQUIVO
+ let busca = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json' and '${pastaId}' in parents and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let arquivos = await busca.json();
+ let fileId = arquivos.files?.[0]?.id;
+
+ let conteudo = JSON.stringify(ag);
+
+ // 🔥 3. SE EXISTE → ATUALIZA
+ if(fileId){
+  await fetch(
+   `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+   {
+    method:"PATCH",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body:conteudo
+   }
+  );
+
+  alert("☁️ Backup atualizado");
+  return;
+ }
+
+ // 🔥 4. SE NÃO EXISTE → CRIA NA PASTA
+ let form = new FormData();
+
+ form.append("metadata", new Blob([JSON.stringify({
+  name:"agenda_backup.json",
+  parents:[pastaId]
+ })], {type:"application/json"}));
+
+ form.append("file", new Blob([conteudo], {type:"application/json"}));
+
+ let upload = await fetch(
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
   {
    method:"POST",
    headers:{
-    Authorization:"Bearer "+accessToken,
-    "Content-Type":"application/json"
+    Authorization:"Bearer "+accessToken
    },
-   body: JSON.stringify({
-    name:nome,
-    mimeType:"application/vnd.google-apps.folder"
-   })
+   body:form
   }
  );
 
- let nova = await pasta.json();
+ let criado = await upload.json();
 
- return nova.id;
-}
+ localStorage.setItem("drive_file_id", criado.id);
+
+ alert("✅ Backup criado na pasta AgendaApp");
+ }
+ 
+
 
  
 // RESTAURAR
 async function restaurarDrive(){
- if(!accessToken) return alert("Login primeiro");
-
- let fileId = localStorage.getItem("drive_file_id");
-
- if(!fileId){
-  alert("Nenhum backup encontrado");
+ if(!accessToken){
+  alert("Faça login primeiro");
   return;
  }
 
- let res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-  headers: { Authorization: "Bearer " + accessToken }
- });
+ let nomePasta = "AgendaApp";
 
- ag = await res.json();
+ let pasta = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder'`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let pastaData = await pasta.json();
+
+ if(!pastaData.files.length){
+  alert("Pasta não encontrada");
+  return;
+ }
+
+ let pastaId = pastaData.files[0].id;
+
+ let busca = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json' and '${pastaId}' in parents`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let arquivos = await busca.json();
+
+ if(!arquivos.files.length){
+  alert("Backup não encontrado");
+  return;
+ }
+
+ let fileId = arquivos.files[0].id;
+
+ let file = await fetch(
+  `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ ag = await file.json();
 
  salvarLocal();
  render();
 
- alert("Backup restaurado 📥");
+ alert("📥 Restaurado com sucesso");
  }
  
 // INIT
