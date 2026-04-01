@@ -69,12 +69,14 @@ function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
 function limpar(){
  cliente.value=tel.value=data.value=hora.value=valor.value="";
  editId=null;
+ if(accessToken) salvarDrive();
 }
 
 // SALVAR
 function salvar(){
  if(!cliente.value||!data.value||!hora.value)return alert("Preencha tudo");
-
+ if(accessToken) salvarDrive();
+ 
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
   ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
@@ -97,6 +99,94 @@ function salvar(){
  render();
 }
 
+ async function salvarDrive(){
+ if(!accessToken){
+  alert("Faça login primeiro");
+  return;
+ }
+
+ const nomePasta = "AgendaApp";
+ const nomeArquivo = "agenda_backup.json";
+
+ // 🔍 BUSCAR PASTA
+ let pastaRes = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let pastaData = await pastaRes.json();
+ let pastaId;
+
+ // 📁 CRIAR PASTA SE NÃO EXISTIR
+ if(pastaData.files.length){
+  pastaId = pastaData.files[0].id;
+ }else{
+  let novaPasta = await fetch("https://www.googleapis.com/drive/v3/files",{
+   method:"POST",
+   headers:{
+    Authorization:"Bearer "+accessToken,
+    "Content-Type":"application/json"
+   },
+   body:JSON.stringify({
+    name:nomePasta,
+    mimeType:"application/vnd.google-apps.folder"
+   })
+  });
+
+  let res = await novaPasta.json();
+  pastaId = res.id;
+ }
+
+ // 🔍 BUSCAR ARQUIVO
+ let fileRes = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomeArquivo}' and '${pastaId}' in parents and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let fileData = await fileRes.json();
+ let fileId = fileData.files?.[0]?.id;
+
+ let conteudo = JSON.stringify(ag);
+
+ // 🔄 ATUALIZAR SE EXISTE
+ if(fileId){
+  await fetch(
+   `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+   {
+    method:"PATCH",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body:conteudo
+   }
+  );
+
+  console.log("Backup atualizado");
+  return;
+ }
+
+ // 📤 CRIAR ARQUIVO
+ let form = new FormData();
+
+ form.append("metadata", new Blob([JSON.stringify({
+  name:nomeArquivo,
+  parents:[pastaId]
+ })], {type:"application/json"}));
+
+ form.append("file", new Blob([conteudo], {type:"application/json"}));
+
+ await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
+  method:"POST",
+  headers:{ Authorization:"Bearer "+accessToken },
+  body:form
+ });
+
+ console.log("Backup criado");
+  
+ }
+
+ 
 // EDITAR / EXCLUIR / OUTROS (mantido igual)
 function editar(id){let a=ag.find(x=>x.id===id);cliente.value=a.cliente;tel.value=a.tel;data.value=a.data;hora.value=a.hora;valor.value=a.valor;editId=id;}
 function excluir(id){if(confirm("Excluir?")){ag=ag.filter(a=>a.id!==id);salvarLocal();render();}}
@@ -104,7 +194,9 @@ function fav(id){let a=ag.find(x=>x.id===id);a.favorito=!a.favorito;salvarLocal(
 function pagar(id){let a=ag.find(x=>x.id===id);a.pago=!a.pago;salvarLocal();render();}
 function reagendar(id){let a=ag.find(x=>x.id===id);ag.push({...a,id:Date.now(),pago:false,favorito:false});salvarLocal();render();}
 function verDetalhes(id){let a=ag.find(x=>x.id===id);alert(`${a.cliente}\n${a.tel}\n${a.data} ${a.hora}\nR$ ${a.valor}`);}
+if(accessToken) salvarDrive();
 
+ 
 // RENDER
 function render(){
  let lista = document.getElementById("lista");
@@ -143,29 +235,47 @@ function render(){
 
 // RELATÓRIO
 function gerarRelatorio(){
- let el=document.getElementById("relatorio");
- let hoje=new Date().toISOString().slice(0,10);
- let mes=hoje.slice(0,7);
 
- let tDia=0,rec=0,pend=0,tMes=0;
+ let el = document.getElementById("relatorio");
+
+ let hoje = new Date().toISOString().slice(0,10);
+ let mes = hoje.slice(0,7);
+
+ let totalDia = 0;
+ let recebido = 0;
+ let pendente = 0;
+ let totalMes = 0;
 
  ag.forEach(a=>{
-  let v=Number(a.valor)||0;
-  if(a.data===hoje){tDia+=v;if(a.pago)rec+=v;}
-  if(!a.pago) pend+=v;
-  if(a.data && a.data.startsWith(mes)) tMes+=v;
+  let v = Number(a.valor) || 0;
+
+  // HOJE
+  if(a.data === hoje){
+   totalDia += v;
+
+   if(a.pago){
+    recebido += v;
+   }else{
+    pendente += v; // 🔥 agora só soma pendente do dia
+   }
+  }
+
+  // MÊS
+  if(a.data && a.data.startsWith(mes)){
+   totalMes += v;
+  }
  });
 
- el.innerHTML=`
+ el.innerHTML = `
  <div class="rel-box">
-  <div class="rel-item">R$ ${tDia.toFixed(2)}<br>Hoje</div>
-  <div class="rel-item">R$ ${rec.toFixed(2)}<br>Recebido</div>
-  <div class="rel-item">R$ ${pend.toFixed(2)}<br>Pendente</div>
-  <div class="rel-item">R$ ${tMes.toFixed(2)}<br>Mês</div>
+  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
+  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
+  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
+  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
   <div class="rel-item">${ag.length}<br>Agendamentos</div>
  </div>`;
-}
-
+  }
+ 
 // GOOGLE + DRIVE (mantido funcional)
 let tokenClient,accessToken=null;
 const CLIENT_ID="877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com";
