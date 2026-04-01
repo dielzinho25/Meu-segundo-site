@@ -79,7 +79,18 @@ function salvar(){
 
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
-  ag[i]={...ag[i],cliente:cliente.value,tel:tel.value,data:data.value,hora:hora.value,valor:+valor.value};
+
+  ag[i]={
+   ...ag[i],
+   cliente:cliente.value,
+   tel:tel.value,
+   data:data.value,
+   hora:hora.value,
+   valor:Number(valor.value) || 0,
+   pago: ag[i].pago === true,
+   favorito: ag[i].favorito === true
+  };
+
  }else{
   ag.push({
    id:Date.now(),
@@ -87,14 +98,16 @@ function salvar(){
    tel:tel.value,
    data:data.value,
    hora:hora.value,
-   valor:+valor.value,
+   valor:Number(valor.value) || 0,
    pago:false,
    favorito:false
   });
  }
 
  salvarLocal();
- if(accessToken) salvarDrive();
+
+ if(accessToken) salvarDrive(); // 🔥 backup automático
+
  limpar();
  render();
 }
