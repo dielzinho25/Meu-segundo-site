@@ -172,49 +172,103 @@ function verDetalhes(id){
  );
 }
 
-// RELATÓRIO
-function gerarRelatorio(){
- let hoje = new Date().toISOString().slice(0,10);
- let mes = hoje.slice(0,7);
+// BACKUP
+async function salvarDrive(){
+ if(!accessToken){
+  alert("Faça login primeiro");
+  return;
+ }
 
- let totalDia = 0;
- let recebido = 0;
- let pendente = 0;
- let totalMes = 0;
- let qtd = ag.length;
+ let nomePasta = "AgendaApp";
 
- ag.forEach(a=>{
-  let valor = Number(a.valor) || 0; // 🔥 CORREÇÃO
+ // 🔍 1. BUSCAR OU CRIAR PASTA
+ let res = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
 
-  // HOJE
-  if(a.data === hoje){
-   totalDia += valor;
+ let data = await res.json();
+ let pastaId;
 
-   if(a.pago){
-    recebido += valor;
+ if(data.files.length > 0){
+  pastaId = data.files[0].id;
+ }else{
+  let pasta = await fetch(
+   "https://www.googleapis.com/drive/v3/files",
+   {
+    method:"POST",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body: JSON.stringify({
+     name:nomePasta,
+     mimeType:"application/vnd.google-apps.folder"
+    })
    }
-  }
+  );
 
-  // PENDENTE (GERAL)
-  if(!a.pago){
-   pendente += valor;
-  }
+  let nova = await pasta.json();
+  pastaId = nova.id;
+ }
 
-  // MÊS
-  if(a.data && a.data.startsWith(mes)){
-   totalMes += valor;
-  }
- });
+ // 🔥 2. VER SE JÁ EXISTE ARQUIVO
+ let busca = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json' and '${pastaId}' in parents and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
 
- relatorio.innerHTML = `
- <div class="rel-box">
-  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
-  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
-  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
-  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
-  <div class="rel-item">${qtd}<br>Agendamentos</div>
- </div>`;
-}
+ let arquivos = await busca.json();
+ let fileId = arquivos.files?.[0]?.id;
+
+ let conteudo = JSON.stringify(ag);
+
+ // 🔥 3. SE EXISTE → ATUALIZA
+ if(fileId){
+  await fetch(
+   `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+   {
+    method:"PATCH",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body:conteudo
+   }
+  );
+
+  alert("☁️ Backup atualizado");
+  return;
+ }
+
+ // 🔥 4. SE NÃO EXISTE → CRIA NA PASTA
+ let form = new FormData();
+
+ form.append("metadata", new Blob([JSON.stringify({
+  name:"agenda_backup.json",
+  parents:[pastaId]
+ })], {type:"application/json"}));
+
+ form.append("file", new Blob([conteudo], {type:"application/json"}));
+
+ let upload = await fetch(
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+  {
+   method:"POST",
+   headers:{
+    Authorization:"Bearer "+accessToken
+   },
+   body:form
+  }
+ );
+
+ let criado = await upload.json();
+
+ localStorage.setItem("drive_file_id", criado.id);
+
+ alert("✅ Backup criado na pasta AgendaApp");
+ }
+ 
  
 // RENDER (ATUALIZADO)
 function render(){
