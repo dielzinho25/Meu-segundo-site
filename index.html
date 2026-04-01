@@ -171,48 +171,7 @@ function verDetalhes(id){
 }
 
 // RELATÓRIO
-function gerarRelatorio(){
- let hoje = new Date().toISOString().slice(0,10);
- let mes = hoje.slice(0,7);
 
- let totalDia = 0;
- let recebido = 0;
- let pendente = 0;
- let totalMes = 0;
- let qtd = ag.length;
-
- ag.forEach(a=>{
-  let valor = Number(a.valor) || 0; // 🔥 CORREÇÃO
-
-  // HOJE
-  if(a.data === hoje){
-   totalDia += valor;
-
-   if(a.pago){
-    recebido += valor;
-   }
-  }
-
-  // PENDENTE (GERAL)
-  if(!a.pago){
-   pendente += valor;
-  }
-
-  // MÊS
-  if(a.data && a.data.startsWith(mes)){
-   totalMes += valor;
-  }
- });
-
- relatorio.innerHTML = `
- <div class="rel-box">
-  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
-  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
-  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
-  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
-  <div class="rel-item">${qtd}<br>Agendamentos</div>
- </div>`;
- }
  
 function atualizarRelatorio(){
  let hoje = new Date().toISOString().slice(0,10);
