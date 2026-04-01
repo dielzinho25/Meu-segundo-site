@@ -60,6 +60,8 @@ button{background:#2e7d32;border:0}
 <script>
 let ag=[];
 let editId=null;
+let busca = document.getElementById("busca");
+let status = document.getElementById("status");
 
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
@@ -216,31 +218,34 @@ function gerarRelatorio(){
  
 // RENDER (ATUALIZADO)
 function render(){
- lista.innerHTML="";
 
+ lista.innerHTML = "";
+
+ ag
  .filter(a=>{
- let b = busca.value.toLowerCase();
- let d = document.getElementById("buscaData").value;
+  let b = busca.value.toLowerCase();
+  let d = document.getElementById("buscaData")?.value || "";
 
- // busca por nome ou telefone
- if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
+  // 🔎 busca nome ou telefone
+  if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
 
- // 🔥 busca por DATA
- if(d && a.data !== d) return false;
+  // 📅 filtro por data
+  if(d && a.data !== d) return false;
 
- // filtro pago/pendente
- if(status.value === "pago" && !a.pago) return false;
- if(status.value === "pendente" && a.pago) return false;
+  // 💰 filtro status
+  if(status.value === "pago" && !a.pago) return false;
+  if(status.value === "pendente" && a.pago) return false;
 
- return true;
-})
- .sort((a,b)=>b.favorito - a.favorito || a.hora.localeCompare(b.hora))
+  return true;
+ })
+ .sort((a,b)=> b.favorito - a.favorito || a.hora.localeCompare(b.hora))
  .forEach(a=>{
-  lista.innerHTML+=`
-  <div class="ag ${a.pago?'pago':''}">
+  lista.innerHTML += `
+  <div class="ag ${a.pago ? 'pago' : ''}">
    <b>${a.data} ${a.hora}</b><br>
-   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${a.valor}
-   <div>${a.tel||""}</div>
+   ${a.favorito ? "⭐ " : ""}${a.cliente} — R$ ${Number(a.valor).toFixed(2)}
+
+   <div>${a.tel || ""}</div>
 
    <button onclick="verDetalhes(${a.id})">👁</button>
    <button onclick="editar(${a.id})">✏️</button>
@@ -251,9 +256,9 @@ function render(){
   </div>`;
  });
 
+ // 📊 atualiza relatório
  gerarRelatorio();
-  
-}
+ }
 
 // NOTIFICAÇÃO
 function ativarNotif(){
@@ -464,6 +469,17 @@ window.onload=()=>{
  if ("serviceWorker" in navigator) {
  navigator.serviceWorker.register("sw.js");
  }
+
+ <script>
+
+ // ... TODO SEU CÓDIGO AQUI (funções, render, etc)
+
+ // 🔥 COLOCA AQUI EMBAIXO
+ busca.addEventListener("input", render);
+ document.getElementById("buscaData").addEventListener("change", render);
+ status.addEventListener("change", render);
+
+</script>
  
 </script>
 
