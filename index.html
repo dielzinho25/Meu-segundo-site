@@ -36,6 +36,7 @@ button{background:#2e7d32;border:0}
 
 <div class="card">
  <input id="busca" placeholder="Buscar..." oninput="render()">
+ <input type="date" id="buscaData">
  <select id="status" onchange="render()">
   <option value="todos">Todos</option>
   <option value="pendente">Pendentes</option>
@@ -171,22 +172,39 @@ function verDetalhes(id){
 
 // RELATÓRIO
 function gerarRelatorio(){
- let hoje=new Date().toISOString().slice(0,10);
- let mes=hoje.slice(0,7);
+ let hoje = new Date().toISOString().slice(0,10);
+ let mes = hoje.slice(0,7);
 
- let totalDia=0, recebido=0, pendente=0, totalMes=0, qtd=0;
+ let totalDia = 0;
+ let recebido = 0;
+ let pendente = 0;
+ let totalMes = 0;
+ let qtd = ag.length;
 
  ag.forEach(a=>{
-  if(a.data===hoje){
-   totalDia+=a.valor;
-   if(a.pago) recebido+=a.valor;
-   else pendente+=a.valor;
+  let valor = Number(a.valor) || 0; // 🔥 CORREÇÃO
+
+  // HOJE
+  if(a.data === hoje){
+   totalDia += valor;
+
+   if(a.pago){
+    recebido += valor;
+   }
   }
-  if(a.data.slice(0,7)===mes) totalMes+=a.valor;
-  qtd++;
+
+  // PENDENTE (GERAL)
+  if(!a.pago){
+   pendente += valor;
+  }
+
+  // MÊS
+  if(a.data && a.data.startsWith(mes)){
+   totalMes += valor;
+  }
  });
 
- relatorio.innerHTML=`
+ relatorio.innerHTML = `
  <div class="rel-box">
   <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
   <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
@@ -194,20 +212,66 @@ function gerarRelatorio(){
   <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
   <div class="rel-item">${qtd}<br>Agendamentos</div>
  </div>`;
-}
+ }
+ 
+function atualizarRelatorio(){
+ let hoje = new Date().toISOString().slice(0,10);
+ let mesAtual = hoje.slice(0,7);
 
+ let totalHoje = 0;
+ let recebido = 0;
+ let pendente = 0;
+ let totalMes = 0;
+
+ ag.forEach(a=>{
+  let valor = Number(a.valor) || 0;
+
+  // HOJE
+  if(a.data === hoje){
+   totalHoje += valor;
+   if(a.pago) recebido += valor;
+  }
+
+  // PENDENTE
+  if(!a.pago){
+   pendente += valor;
+  }
+
+  // MÊS
+  if(a.data.startsWith(mesAtual)){
+   totalMes += valor;
+  }
+ });
+
+ // atualiza tela
+ document.getElementById("rHoje").innerText = "R$ " + totalHoje.toFixed(2);
+ document.getElementById("rRecebido").innerText = "R$ " + recebido.toFixed(2);
+ document.getElementById("rPendente").innerText = "R$ " + pendente.toFixed(2);
+ document.getElementById("rMes").innerText = "R$ " + totalMes.toFixed(2);
+ document.getElementById("rTotal").innerText = ag.length;
+ 
+}
+ 
 // RENDER (ATUALIZADO)
 function render(){
  lista.innerHTML="";
 
- ag
  .filter(a=>{
-  let b=busca.value.toLowerCase();
-  if(b&&!a.cliente.toLowerCase().includes(b)&&!(a.tel||"").includes(b))return false;
-  if(status.value==="pago"&&!a.pago)return false;
-  if(status.value==="pendente"&&a.pago)return false;
-  return true;
- })
+ let b = busca.value.toLowerCase();
+ let d = document.getElementById("buscaData").value;
+
+ // busca por nome ou telefone
+ if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
+
+ // 🔥 busca por DATA
+ if(d && a.data !== d) return false;
+
+ // filtro pago/pendente
+ if(status.value === "pago" && !a.pago) return false;
+ if(status.value === "pendente" && a.pago) return false;
+
+ return true;
+})
  .sort((a,b)=>b.favorito - a.favorito || a.hora.localeCompare(b.hora))
  .forEach(a=>{
   lista.innerHTML+=`
@@ -226,6 +290,7 @@ function render(){
  });
 
  gerarRelatorio();
+ atualizarRelatorio();
 }
 
 // NOTIFICAÇÃO
