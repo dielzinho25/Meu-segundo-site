@@ -35,9 +35,9 @@ button{background:#2e7d32;border:0}
 </div>
 
 <div class="card">
- <input id="busca" placeholder="Buscar...">
+ <input id="busca" placeholder="Buscar..." oninput="render()">
  <input type="date" id="buscaData">
- <select id="status">
+ <select id="status" onchange="render()">
   <option value="todos">Todos</option>
   <option value="pendente">Pendentes</option>
   <option value="pago">Pagos</option>
@@ -60,6 +60,8 @@ button{background:#2e7d32;border:0}
 <script>
 let ag=[];
 let editId=null;
+let busca = document.getElementById("busca");
+let status = document.getElementById("status");
 
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
@@ -71,7 +73,7 @@ function limpar(){
  editId=null;
 }
 
-// SALVAR
+// SALVAR / EDITAR
 function salvar(){
  if(!cliente.value||!data.value||!hora.value)return alert("Preencha tudo");
 
@@ -93,42 +95,159 @@ function salvar(){
 
  salvarLocal();
  if(accessToken) salvarDrive();
-
  limpar();
  render();
 }
 
-// AÇÕES
-function editar(id){let a=ag.find(x=>x.id===id);cliente.value=a.cliente;tel.value=a.tel;data.value=a.data;hora.value=a.hora;valor.value=a.valor;editId=id;}
-function excluir(id){if(confirm("Excluir?")){ag=ag.filter(a=>a.id!==id);salvarLocal();if(accessToken) salvarDrive();render();}}
-function fav(id){let a=ag.find(x=>x.id===id);a.favorito=!a.favorito;salvarLocal();if(accessToken) salvarDrive();render();}
-function pagar(id){let a=ag.find(x=>x.id===id);a.pago=!a.pago;salvarLocal();if(accessToken) salvarDrive();render();}
-function reagendar(id){let a=ag.find(x=>x.id===id);ag.push({...a,id:Date.now(),pago:false,favorito:false});salvarLocal();if(accessToken) salvarDrive();render();}
+// EDITAR
+function editar(id){
+ let a=ag.find(x=>x.id===id);
+ cliente.value=a.cliente;
+ tel.value=a.tel;
+ data.value=a.data;
+ hora.value=a.hora;
+ valor.value=a.valor;
+ editId=id;
+}
 
-// RENDER
+// EXCLUIR
+function excluir(id){
+ if(confirm("Excluir?")){
+  ag=ag.filter(a=>a.id!==id);
+  salvarLocal();
+  if(accessToken) salvarDrive();
+  render();
+ }
+}
+
+// FAVORITO
+function fav(id){
+ let a=ag.find(x=>x.id===id);
+ a.favorito=!a.favorito;
+ salvarLocal();
+ render();
+}
+
+// PAGAR
+function pagar(id){
+ let a = ag.find(x => x.id === id);
+
+ a.pago = !a.pago;
+
+ salvarLocal();
+ if(accessToken) salvarDrive();
+ render();
+ }
+
+// REAGENDAR
+function reagendar(id){
+ let a = ag.find(x => x.id === id);
+
+ ag.push({
+  ...a,
+  id: Date.now(),
+  pago: false,
+  favorito: false
+ });
+
+ salvarLocal();
+ if(accessToken) salvarDrive();
+ render();
+
+ alert("✅ Cópia criada, agora você pode editar");
+ }
+
+// DETALHES
+function verDetalhes(id){
+ let a=ag.find(x=>x.id===id);
+
+ alert(
+ "👤 "+a.cliente+
+ "\n📞 "+a.tel+
+ "\n📅 "+a.data+
+ "\n⏰ "+a.hora+
+ "\n💰 R$ "+a.valor+
+ "\n⭐ "+(a.favorito?"Sim":"Não")+
+ "\n💵 "+(a.pago?"Pago":"Pendente")
+ );
+}
+
+// RELATÓRIO
+function gerarRelatorio(){
+ let hoje = new Date().toISOString().slice(0,10);
+ let mes = hoje.slice(0,7);
+
+ let totalDia = 0;
+ let recebido = 0;
+ let pendente = 0;
+ let totalMes = 0;
+ let qtd = ag.length;
+
+ ag.forEach(a=>{
+  let valor = Number(a.valor) || 0; // 🔥 CORREÇÃO
+
+  // HOJE
+  if(a.data === hoje){
+   totalDia += valor;
+
+   if(a.pago){
+    recebido += valor;
+   }
+  }
+
+  // PENDENTE (GERAL)
+  if(!a.pago){
+   pendente += valor;
+  }
+
+  // MÊS
+  if(a.data && a.data.startsWith(mes)){
+   totalMes += valor;
+  }
+ });
+
+ relatorio.innerHTML = `
+ <div class="rel-box">
+  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
+  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
+  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
+  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
+  <div class="rel-item">${qtd}<br>Agendamentos</div>
+ </div>`;
+}
+ 
+// RENDER (ATUALIZADO)
 function render(){
- let lista=document.getElementById("lista");
- let busca=document.getElementById("busca").value.toLowerCase();
- let status=document.getElementById("status").value;
- let dataFiltro=document.getElementById("buscaData").value;
 
- lista.innerHTML="";
+ lista.innerHTML = "";
 
  ag
  .filter(a=>{
-  if(busca && !a.cliente.toLowerCase().includes(busca) && !(a.tel||"").includes(busca)) return false;
-  if(dataFiltro && a.data!==dataFiltro) return false;
-  if(status==="pago" && !a.pago) return false;
-  if(status==="pendente" && a.pago) return false;
+  let b = busca.value.toLowerCase();
+  let d = document.getElementById("buscaData")?.value || "";
+
+  // 🔎 busca nome ou telefone
+  if(b && !a.cliente.toLowerCase().includes(b) && !(a.tel||"").includes(b)) return false;
+
+  // 📅 filtro por data
+  if(d && a.data !== d) return false;
+
+  // 💰 filtro status
+  if(status.value === "pago" && !a.pago) return false;
+  if(status.value === "pendente" && a.pago) return false;
+
   return true;
  })
- .sort((a,b)=>b.favorito-a.favorito || a.hora.localeCompare(b.hora))
+ .sort((a,b)=> b.favorito - a.favorito || a.hora.localeCompare(b.hora))
  .forEach(a=>{
-  lista.innerHTML+=`
-  <div class="ag ${a.pago?'pago':''}">
+  lista.innerHTML += `
+  <div class="ag ${a.pago ? 'pago' : ''}">
    <b>${a.data} ${a.hora}</b><br>
-   ${a.favorito?"⭐ ":""}${a.cliente} — R$ ${Number(a.valor).toFixed(2)}
-   <div>${a.tel||""}</div>
+   ${a.favorito ? "⭐ " : ""}${a.cliente} — R$ ${Number(a.valor).toFixed(2)}
+
+   <div>${a.tel || ""}</div>
+
+   <button onclick="verDetalhes(${a.id})">👁</button>
    <button onclick="editar(${a.id})">✏️</button>
    <button onclick="pagar(${a.id})">💰</button>
    <button onclick="fav(${a.id})">⭐</button>
@@ -137,68 +256,227 @@ function render(){
   </div>`;
  });
 
+ // 📊 atualiza relatório
  gerarRelatorio();
+ }
+
+// NOTIFICAÇÃO
+function ativarNotif(){
+ if(Notification.permission !== "granted"){
+  Notification.requestPermission();
+ }
 }
 
-// RELATÓRIO CORRIGIDO
-function gerarRelatorio(){
- let el=document.getElementById("relatorio");
- let hoje=new Date().toISOString().slice(0,10);
- let mes=hoje.slice(0,7);
-
- let totalDia=0,recebido=0,pendente=0,totalMes=0;
-
- ag.forEach(a=>{
-  let v=Number(a.valor)||0;
-
-  if(a.data===hoje){
-   totalDia+=v;
-   if(a.pago) recebido+=v;
-   else pendente+=v;
-  }
-
-  if(a.data && a.data.startsWith(mes)){
-   totalMes+=v;
-  }
- });
-
- el.innerHTML=`
- <div class="rel-box">
-  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
-  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
-  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
-  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
-  <div class="rel-item">${ag.length}<br>Agendamentos</div>
- </div>`;
+function notificar(titulo, corpo){
+ if(Notification.permission === "granted"){
+  navigator.serviceWorker.getRegistration().then(reg=>{
+   if(reg){
+    reg.showNotification(titulo,{
+     body:corpo,
+     icon:"https://cdn-icons-png.flaticon.com/512/1827/1827392.png"
+    });
+   }else{
+    new Notification(titulo,{body:corpo});
+   }
+  });
+ }
 }
 
 // GOOGLE
-let tokenClient,accessToken=null;
+let tokenClient;
+let accessToken=null;
+
+const CLIENT_ID="877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com";
 
 function initGoogle(){
  tokenClient=google.accounts.oauth2.initTokenClient({
-  client_id:"877191590019-7ob34ind8ksu4fjp91orrrrvnk9p10hp.apps.googleusercontent.com",
+  client_id:CLIENT_ID,
   scope:"https://www.googleapis.com/auth/drive.file",
-  callback:(res)=>{accessToken=res.access_token;localStorage.setItem("token",accessToken);}
+  callback:(res)=>{
+   if(res.error)return alert("Erro login");
+   accessToken=res.access_token;
+   localStorage.setItem("token",accessToken);
+   alert("Login OK");
+  }
  });
 }
 
-function loginGoogle(){tokenClient.requestAccessToken();}
+function loginGoogle(){
+ tokenClient.requestAccessToken();
+}
 
+// BACKUP
+async function salvarDrive(){
+ if(!accessToken){
+  alert("Faça login primeiro");
+  return;
+ }
+
+ let nomePasta = "AgendaApp";
+
+ // 🔍 1. BUSCAR OU CRIAR PASTA
+ let res = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let data = await res.json();
+ let pastaId;
+
+ if(data.files.length > 0){
+  pastaId = data.files[0].id;
+ }else{
+  let pasta = await fetch(
+   "https://www.googleapis.com/drive/v3/files",
+   {
+    method:"POST",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body: JSON.stringify({
+     name:nomePasta,
+     mimeType:"application/vnd.google-apps.folder"
+    })
+   }
+  );
+
+  let nova = await pasta.json();
+  pastaId = nova.id;
+ }
+
+ // 🔥 2. VER SE JÁ EXISTE ARQUIVO
+ let busca = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json' and '${pastaId}' in parents and trashed=false`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let arquivos = await busca.json();
+ let fileId = arquivos.files?.[0]?.id;
+
+ let conteudo = JSON.stringify(ag);
+
+ // 🔥 3. SE EXISTE → ATUALIZA
+ if(fileId){
+  await fetch(
+   `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+   {
+    method:"PATCH",
+    headers:{
+     Authorization:"Bearer "+accessToken,
+     "Content-Type":"application/json"
+    },
+    body:conteudo
+   }
+  );
+
+  alert("☁️ Backup atualizado");
+  return;
+ }
+
+ // 🔥 4. SE NÃO EXISTE → CRIA NA PASTA
+ let form = new FormData();
+
+ form.append("metadata", new Blob([JSON.stringify({
+  name:"agenda_backup.json",
+  parents:[pastaId]
+ })], {type:"application/json"}));
+
+ form.append("file", new Blob([conteudo], {type:"application/json"}));
+
+ let upload = await fetch(
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+  {
+   method:"POST",
+   headers:{
+    Authorization:"Bearer "+accessToken
+   },
+   body:form
+  }
+ );
+
+ let criado = await upload.json();
+
+ localStorage.setItem("drive_file_id", criado.id);
+
+ alert("✅ Backup criado na pasta AgendaApp");
+ }
+ 
+// RESTAURAR
+async function restaurarDrive(){
+ if(!accessToken){
+  alert("Faça login primeiro");
+  return;
+ }
+
+ let nomePasta = "AgendaApp";
+
+ let pasta = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='${nomePasta}' and mimeType='application/vnd.google-apps.folder'`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let pastaData = await pasta.json();
+
+ if(!pastaData.files.length){
+  alert("Pasta não encontrada");
+  return;
+ }
+
+ let pastaId = pastaData.files[0].id;
+
+ let busca = await fetch(
+  `https://www.googleapis.com/drive/v3/files?q=name='agenda_backup.json' and '${pastaId}' in parents`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ let arquivos = await busca.json();
+
+ if(!arquivos.files.length){
+  alert("Backup não encontrado");
+  return;
+ }
+
+ let fileId = arquivos.files[0].id;
+
+ let file = await fetch(
+  `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+  { headers:{ Authorization:"Bearer "+accessToken } }
+ );
+
+ ag = await file.json();
+
+ salvarLocal();
+ render();
+
+ alert("📥 Restaurado com sucesso");
+ }
+ 
 // INIT
 window.onload=()=>{
  carregarLocal();
  render();
  initGoogle();
+ ativarNotif();
 
  let t=localStorage.getItem("token");
- if(t) accessToken=t;
+ if(t)accessToken=t;
+}
 
- document.getElementById("busca").addEventListener("input",render);
- document.getElementById("buscaData").addEventListener("change",render);
- document.getElementById("status").addEventListener("change",render);
-};
+ if ("serviceWorker" in navigator) {
+ navigator.serviceWorker.register("sw.js");
+ }
+
+
+
+ // ... TODO SEU CÓDIGO AQUI (funções, render, etc)
+
+ // 🔥 COLOCA AQUI EMBAIXO
+ busca.addEventListener("input", render);
+ document.getElementById("buscaData").addEventListener("change", render);
+ status.addEventListener("change", render);
+ 
 </script>
 
 </body>
-</html>
+ </html>
