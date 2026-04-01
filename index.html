@@ -171,45 +171,49 @@ function verDetalhes(id){
 }
 
 // RELATÓRIO
-
- 
-function atualizarRelatorio(){
+function gerarRelatorio(){
  let hoje = new Date().toISOString().slice(0,10);
- let mesAtual = hoje.slice(0,7);
+ let mes = hoje.slice(0,7);
 
- let totalHoje = 0;
+ let totalDia = 0;
  let recebido = 0;
  let pendente = 0;
  let totalMes = 0;
+ let qtd = ag.length;
 
  ag.forEach(a=>{
-  let valor = Number(a.valor) || 0;
+  let valor = Number(a.valor) || 0; // 🔥 CORREÇÃO
 
   // HOJE
   if(a.data === hoje){
-   totalHoje += valor;
-   if(a.pago) recebido += valor;
+   totalDia += valor;
+
+   if(a.pago){
+    recebido += valor;
+   }
   }
 
-  // PENDENTE
+  // PENDENTE (GERAL)
   if(!a.pago){
    pendente += valor;
   }
 
   // MÊS
-  if(a.data.startsWith(mesAtual)){
+  if(a.data && a.data.startsWith(mes)){
    totalMes += valor;
   }
  });
 
- // atualiza tela
- document.getElementById("rHoje").innerText = "R$ " + totalHoje.toFixed(2);
- document.getElementById("rRecebido").innerText = "R$ " + recebido.toFixed(2);
- document.getElementById("rPendente").innerText = "R$ " + pendente.toFixed(2);
- document.getElementById("rMes").innerText = "R$ " + totalMes.toFixed(2);
- document.getElementById("rTotal").innerText = ag.length;
- 
+ relatorio.innerHTML = `
+ <div class="rel-box">
+  <div class="rel-item">R$ ${totalDia.toFixed(2)}<br>Hoje</div>
+  <div class="rel-item">R$ ${recebido.toFixed(2)}<br>Recebido</div>
+  <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
+  <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
+  <div class="rel-item">${qtd}<br>Agendamentos</div>
+ </div>`;
 }
+ 
  
 // RENDER (ATUALIZADO)
 function render(){
