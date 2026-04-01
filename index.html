@@ -213,44 +213,6 @@ function gerarRelatorio(){
   <div class="rel-item">${qtd}<br>Agendamentos</div>
  </div>`;
 }
- //ATUALIZA RELATÓRIO//
- function atualizarRelatorio(){
- let hoje = new Date().toISOString().slice(0,10);
- let mesAtual = hoje.slice(0,7);
-
- let totalHoje = 0;
- let recebido = 0;
- let pendente = 0;
- let totalMes = 0;
-
- ag.forEach(a=>{
-  let valor = Number(a.valor) || 0;
-
-  // HOJE
-  if(a.data === hoje){
-   totalHoje += valor;
-   if(a.pago) recebido += valor;
-  }
-
-  // PENDENTE
-  if(!a.pago){
-   pendente += valor;
-  }
-
-  // MÊS
-  if(a.data.startsWith(mesAtual)){
-   totalMes += valor;
-  }
- });
-
- // atualiza tela
- document.getElementById("rHoje").innerText = "R$ " + totalHoje.toFixed(2);
- document.getElementById("rRecebido").innerText = "R$ " + recebido.toFixed(2);
- document.getElementById("rPendente").innerText = "R$ " + pendente.toFixed(2);
- document.getElementById("rMes").innerText = "R$ " + totalMes.toFixed(2);
- document.getElementById("rTotal").innerText = ag.length;
- }
- 
  
 // RENDER (ATUALIZADO)
 function render(){
@@ -291,8 +253,6 @@ function render(){
 
  gerarRelatorio();
   
-}
- atualizarRelatorio();
 }
 
 // NOTIFICAÇÃO
