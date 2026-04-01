@@ -69,13 +69,11 @@ function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
 function limpar(){
  cliente.value=tel.value=data.value=hora.value=valor.value="";
  editId=null;
- if(accessToken) salvarDrive();
 }
 
 // SALVAR
 function salvar(){
  if(!cliente.value||!data.value||!hora.value)return alert("Preencha tudo");
- if(accessToken) salvarDrive();
  
  if(editId){
   let i=ag.findIndex(a=>a.id===editId);
@@ -186,17 +184,74 @@ function salvar(){
   
  }
 
- 
 // EDITAR / EXCLUIR / OUTROS (mantido igual)
-function editar(id){let a=ag.find(x=>x.id===id);cliente.value=a.cliente;tel.value=a.tel;data.value=a.data;hora.value=a.hora;valor.value=a.valor;editId=id;}
-function excluir(id){if(confirm("Excluir?")){ag=ag.filter(a=>a.id!==id);salvarLocal();render();}}
-function fav(id){let a=ag.find(x=>x.id===id);a.favorito=!a.favorito;salvarLocal();render();}
-function pagar(id){let a=ag.find(x=>x.id===id);a.pago=!a.pago;salvarLocal();render();}
-function reagendar(id){let a=ag.find(x=>x.id===id);ag.push({...a,id:Date.now(),pago:false,favorito:false});salvarLocal();render();}
-function verDetalhes(id){let a=ag.find(x=>x.id===id);alert(`${a.cliente}\n${a.tel}\n${a.data} ${a.hora}\nR$ ${a.valor}`);}
-if(accessToken) salvarDrive();
+function editar(id){
+ let a = ag.find(x=>x.id===id);
+ cliente.value = a.cliente;
+ tel.value = a.tel;
+ data.value = a.data;
+ hora.value = a.hora;
+ valor.value = a.valor;
+ editId = id;
+}
 
+function excluir(id){
+ if(confirm("Excluir?")){
+  ag = ag.filter(a=>a.id!==id);
+
+  salvarLocal();
+
+  if(accessToken) salvarDrive(); // 🔥 AQUI
+
+  render();
+ }
+}
+
+function fav(id){
+ let a = ag.find(x=>x.id===id);
+ a.favorito = !a.favorito;
+
+ salvarLocal();
+
+ if(accessToken) salvarDrive(); // 🔥 AQUI
+
+ render();
+}
+
+function pagar(id){
+ let a = ag.find(x=>x.id===id);
+ a.pago = !a.pago;
+
+ salvarLocal();
+
+ if(accessToken) salvarDrive(); // 🔥 AQUI
+
+ render();
+}
+
+function reagendar(id){
+ let a = ag.find(x=>x.id===id);
+
+ ag.push({
+  ...a,
+  id: Date.now(),
+  pago: false,
+  favorito: false
+ });
+
+ salvarLocal();
+
+ if(accessToken) salvarDrive(); // 🔥 AQUI
+
+ render();
+}
+
+function verDetalhes(id){
+ let a = ag.find(x=>x.id===id);
+ alert(`${a.cliente}\n${a.tel}\n${a.data} ${a.hora}\nR$ ${a.valor}`);
+ }
  
+
 // RENDER
 function render(){
  let lista = document.getElementById("lista");
