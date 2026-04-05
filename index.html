@@ -7,6 +7,7 @@
 <title>Agenda PRO</title>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{font-family:Arial;background:#121212;color:#fff;margin:0}
@@ -227,6 +228,8 @@ function gerarRelatorio(){
   <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
   <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
   <div class="rel-item">${qtd}<br>Agendamentos</div>
+  </div>
+  <button onclick="gerarPDFCliente()">📄 Gerar PDF do Cliente</button>
  </div>`;
   }
 
@@ -490,6 +493,62 @@ window.onload=()=>{
  busca.addEventListener("input", render);
  document.getElementById("buscaData").addEventListener("change", render);
  status.addEventListener("change", render);
+ 
+ 
+ // Gerar PDF
+ async function gerarPDFCliente(){
+
+ let nomeBusca = busca.value.toLowerCase();
+
+ if(!nomeBusca){
+  alert("Digite o nome do cliente na busca");
+  return;
+ }
+
+ let listaCliente = ag.filter(a => 
+  a.cliente.toLowerCase().includes(nomeBusca)
+ );
+
+ if(listaCliente.length === 0){
+  alert("Cliente não encontrado");
+  return;
+ }
+
+ // 🔥 soma total
+ let total = listaCliente.reduce((soma,a)=> soma + (Number(a.valor)||0), 0);
+
+ // 📱 pega telefone (primeiro encontrado)
+ let telefone = listaCliente[0].tel || "";
+
+ // 📄 cria PDF
+ const { jsPDF } = window.jspdf;
+ let doc = new jsPDF();
+
+ doc.setFontSize(14);
+ doc.text("Relatório do Cliente", 10, 10);
+
+ doc.setFontSize(12);
+ doc.text("Cliente: " + listaCliente[0].cliente, 10, 20);
+
+ let y = 30;
+
+ listaCliente.forEach(a=>{
+  doc.text(`${a.data} ${a.hora} - R$ ${a.valor} - ${a.pago ? "Pago" : "Pendente"}`, 10, y);
+  y += 8;
+ });
+
+ doc.text("Total: R$ " + total.toFixed(2), 10, y + 10);
+
+ // 🔥 salva PDF
+ doc.save("relatorio_cliente.pdf");
+
+ // 📲 abre WhatsApp
+ if(telefone){
+  let msg = `Relatório de atendimentos\nTotal: R$ ${total.toFixed(2)}`;
+  let url = `https://wa.me/55${telefone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank");
+ }
+}
  
 </script>
 
