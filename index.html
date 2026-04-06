@@ -4,7 +4,7 @@
 <link rel="manifest" href="manifest.json">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agenda PRO</title>
+<title>Passadoria Ediel&Rodrigues</title>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -469,6 +469,26 @@ async function restaurarDrive(){
 
  alert("📥 Restaurado com sucesso");
  }
+// verificarNotificacoes //
+ function verificarNotificacoes(){
+
+ let agora = new Date();
+
+ let hoje = agora.toISOString().slice(0,10);
+ let horaAtual = agora.toTimeString().slice(0,5);
+
+ ag.forEach(a=>{
+  if(a.data === hoje && a.hora === horaAtual){
+
+   notificar(
+    "📅 Agendamento",
+    `${a.cliente} às ${a.hora}`
+   );
+
+  }
+ });
+  }
+ 
  
 // INIT
 window.onload=()=>{
@@ -488,6 +508,7 @@ window.onload=()=>{
  setInterval(verificarNotificacoes, 60000);
 }
 
+ //serviceWorker//
  if ("serviceWorker" in navigator) {
  navigator.serviceWorker.register("sw.js");
  }
@@ -556,24 +577,6 @@ window.onload=()=>{
   window.open(url, "_blank");
  }
 }
- function verificarNotificacoes(){
-
- let agora = new Date();
-
- let hoje = agora.toISOString().slice(0,10);
- let horaAtual = agora.toTimeString().slice(0,5);
-
- ag.forEach(a=>{
-  if(a.data === hoje && a.hora === horaAtual){
-
-   notificar(
-    "📅 Agendamento",
-    `${a.cliente} às ${a.hora}`
-   );
-
-  }
- });
-  }
  
 </script>
 
