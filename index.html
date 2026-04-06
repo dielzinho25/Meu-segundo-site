@@ -475,10 +475,17 @@ window.onload=()=>{
  carregarLocal();
  render();
  initGoogle();
+
+ // 🔔 PERMISSÃO NOTIFICAÇÃO
+ Notification.requestPermission();
+
  ativarNotif();
 
  let t=localStorage.getItem("token");
  if(t)accessToken=t;
+
+ // 🔥 VERIFICA AUTOMÁTICO
+ setInterval(verificarNotificacoes, 60000);
 }
 
  if ("serviceWorker" in navigator) {
@@ -549,6 +556,24 @@ window.onload=()=>{
   window.open(url, "_blank");
  }
 }
+ function verificarNotificacoes(){
+
+ let agora = new Date();
+
+ let hoje = agora.toISOString().slice(0,10);
+ let horaAtual = agora.toTimeString().slice(0,5);
+
+ ag.forEach(a=>{
+  if(a.data === hoje && a.hora === horaAtual){
+
+   notificar(
+    "📅 Agendamento",
+    `${a.cliente} às ${a.hora}`
+   );
+
+  }
+ });
+  }
  
 </script>
 
