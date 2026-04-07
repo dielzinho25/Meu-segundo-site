@@ -190,46 +190,53 @@ function verDetalhes(id){
 function gerarRelatorio(){
 
  let hoje = new Date().toISOString().slice(0,10);
+ let mes = hoje.slice(0,7);
 
  let hojeRecebido = 0;
  let recebidoTotal = 0;
  let pendente = 0;
  let totalMes = 0;
- let qtd = ag.length;
+
+ let totalGeral = 0; // 🔥 NOVO
+
+ // 🔥 só reservados
+ let qtd = ag.filter(a => !a.pago).length;
 
  ag.forEach(a=>{
   let valor = Number(a.valor) || 0;
 
-  // 🔥 HOJE (somente pagos hoje)
+  // 🔥 TOTAL GERAL (tudo)
+  totalGeral += valor;
+
+  // HOJE (pagos hoje)
   if(a.data === hoje && a.pago){
    hojeRecebido += valor;
   }
 
-  // 🔥 RECEBIDO TOTAL (todos pagos)
+  // RECEBIDO TOTAL (pagos)
   if(a.pago){
    recebidoTotal += valor;
   }
 
-  // 🔥 PENDENTE (só não pago)
+  // PENDENTE (não pagos)
   if(!a.pago){
    pendente += valor;
   }
 
-  // 🔥 MÊS (baseado na data do item)
-  if(a.pago){
+  // MÊS (pagos)
+  if(a.data && a.data.startsWith(mes) && a.pago){
    totalMes += valor;
   }
  });
 
  relatorio.innerHTML = `
  <div class="rel-box">
+  <div class="rel-item">R$ ${totalGeral.toFixed(2)}<br>Total Geral</div>
   <div class="rel-item">R$ ${hojeRecebido.toFixed(2)}<br>Hoje</div>
   <div class="rel-item">R$ ${recebidoTotal.toFixed(2)}<br>Recebido</div>
   <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
   <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
-  <div class="rel-item">${qtd}<br>Agendamentos</div>
-  </div>
-  <button onclick="gerarPDFCliente()">📄 Gerar PDF do Cliente</button>
+  <div class="rel-item">${qtd}<br>Reservados</div>
  </div>`;
   }
 
