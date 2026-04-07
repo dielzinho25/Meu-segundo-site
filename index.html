@@ -36,7 +36,7 @@ button{background:#2e7d32;border:0}
 
 <body>
 
-<header><b>📅 Agenda PRO</b></header>
+<header><b>📅 Passadoria Ediel&Jéssica</b></header>
 
 <div class="card">
  <input id="cliente" placeholder="Cliente">
@@ -66,6 +66,9 @@ button{background:#2e7d32;border:0}
 <div class="card">
  <b>📊 Relatório</b>
  <div id="relatorio"></div>
+ <div style="text-align:center; margin-top:10px;">
+  <button onclick="gerarPDFCliente()">📄 Gerar PDF do Cliente</button>
+ </div>
 </div>
 
 <div class="card" id="lista"></div>
@@ -249,8 +252,6 @@ function gerarRelatorio(){
   <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
   <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
   <div class="rel-item">${qtd}<br>Reservados</div>
-  <div class="centralizar">
-  <button onclick="gerarPDFCliente()">📄 Gerar PDF do Cliente</button>
  </div>`;
   }
 
