@@ -79,6 +79,7 @@ let editId=null;
 let busca = document.getElementById("busca");
 let status = document.getElementById("status");
 
+
 // LOCAL
 function salvarLocal(){localStorage.setItem("agenda",JSON.stringify(ag))}
 function carregarLocal(){ag=JSON.parse(localStorage.getItem("agenda")||"[]")}
@@ -211,6 +212,7 @@ function gerarRelatorio(){
  let recebidoTotal = 0;
  let pendente = 0;
  let totalMes = 0;
+ let qtd = ag.length;
 
  let totalGeral = 0; // 🔥 NOVO
 
@@ -252,6 +254,8 @@ function gerarRelatorio(){
   <div class="rel-item">R$ ${pendente.toFixed(2)}<br>Pendente</div>
   <div class="rel-item">R$ ${totalMes.toFixed(2)}<br>Mês</div>
   <div class="rel-item">${qtd}<br>Reservados</div>
+  <div class="rel-item">${qtd}<br>Agendamentos</div>
+  </div>
  </div>`;
   }
 
