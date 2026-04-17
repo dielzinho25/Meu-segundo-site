@@ -599,6 +599,11 @@ window.onload=()=>{
   window.open(url, "_blank");
  }
 }
+ setInterval(()=>{
+ if(accessToken){
+  salvarDrive();
+ }
+}, 60000); // a cada 1 minuto
  
 </script>
 
