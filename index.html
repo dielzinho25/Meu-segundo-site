@@ -128,7 +128,13 @@ function salvar(){
  limpar();
  render();
 }
+function autoBackup(){
+ if(accessToken){
+  salvarDrive();
+ }
+}
 
+ 
 // EDITAR
 function editar(id){
  let a=ag.find(x=>x.id===id);
@@ -155,7 +161,8 @@ function fav(id){
  let a=ag.find(x=>x.id===id);
  a.favorito=!a.favorito;
  salvarLocal();
- render();
+if(accessToken) salvarDrive();
+render();
 }
 
 // PAGAR
@@ -172,14 +179,12 @@ function pagar(id){
 // REAGENDAR
 function reagendar(id){
  let a = ag.find(x => x.id === id);
-
  ag.push({
   ...a,
   id: Date.now(),
   pago: false,
   favorito: false
  });
-
  salvarLocal();
  if(accessToken) salvarDrive();
  render();
@@ -336,7 +341,7 @@ function initGoogle(){
    if(res.error)return alert("Erro login");
    accessToken=res.access_token;
    localStorage.setItem("token",accessToken);
-   alert("Login OK");
+   alert("Conectado Google Drive");
   }
  });
 }
